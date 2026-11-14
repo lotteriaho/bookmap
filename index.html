@@ -79,6 +79,17 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 #st2 .cl .rr{text-align:right;font:700 12.5px var(--mono)}
 #st2 .tag{font-size:10px;padding:1px 5px;border-radius:4px;background:rgba(255,255,255,.07);color:var(--mut)}
 #st2 .tag.tp{color:var(--buy);background:rgba(34,197,139,.12)} #st2 .tag.sl{color:var(--sell);background:rgba(239,83,80,.12)}
+#st2 .sec select{font-size:11px;padding:1px 4px;text-transform:none}
+#st2 .flt{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;column-gap:10px;row-gap:3px;align-items:center;font-size:12px}
+#st2 .flt .h{color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.03em}
+#st2 .flt .r{text-align:right;font-family:var(--mono);white-space:nowrap}
+#st2 .flt label{display:contents;cursor:pointer}
+#st2 .flt label>span{text-transform:none;letter-spacing:0;font-size:12px;color:var(--fg)}
+#st2 .kpi.on div{border-color:rgba(244,180,58,.6)}
+#st2 .flt .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#st2 .flt .ft{grid-column:1/-1;color:var(--mut);font-size:11px;line-height:1.4;margin-top:4px}
+#st2 .fbadge{color:#f4b43a}
+#st2 .chips{display:flex;gap:3px;flex-wrap:wrap;margin-left:6px} #st2 .chips span{font-size:9.5px;padding:0 4px;border-radius:3px;background:rgba(34,197,139,.14);color:var(--buy)}
 #st2 .empty2{color:var(--mut);font-size:12px;padding:4px 0}
 #help{position:absolute;right:160px;top:10px;z-index:4;max-width:360px;background:rgba(17,23,34,.92);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--mut)}
 #help b{color:var(--fg)} #help .x{float:right;cursor:pointer;color:var(--fg)}
@@ -124,6 +135,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
     <div class="body">
       <div class="kpi" id="stkpi"></div>
       <div class="setups" id="stsetup"></div>
+      <div class="sec"><span>Điều kiện lọc</span><select id="stfset" title="Xem theo setup"><option value="">Mọi setup</option><option>A</option><option>B</option><option>C</option><option>D</option></select></div>
+      <div class="flt" id="stflt"></div>
       <div class="sec" id="stopenh"></div><div id="stopen"></div>
       <div class="sec" id="stclh"></div><div id="stclosed"></div>
     </div>
@@ -334,6 +347,20 @@ async function resolveOpen(all){
 }
 function recentRange(sec){ const n=Math.max(4,Math.round(sec*1000/S.speed)); let lo=Infinity,hi=-Infinity;
   for(let i=Math.max(0,S.cols.length-n);i<S.cols.length;i++){ lo=Math.min(lo,S.cols[i].bid); hi=Math.max(hi,S.cols[i].ask); } return isFinite(lo)?hi-lo:0; }
+// ---------- điều kiện lọc: ghi lại lúc vào lệnh, để so sánh tỷ lệ thắng có / không có điều kiện ----------
+const FILT=[["trend","Thuận xu hướng","XH","Giá 10 phút gần nhất đi cùng hướng lệnh"],["cvd","CVD cùng chiều","CVD","CVD 60 giây gần nhất tăng (lệnh mua) / giảm (lệnh bán)"],["book","Sổ lệnh nghiêng","Sổ","Lệnh chờ trong ±0,15% quanh giá nghiêng về phía lệnh (chênh > 10%)"],["vol","Khối lượng tăng","KL","Khối lượng 1 phút gần nhất > 1,5 lần trung bình 10 phút"],["sess","Phiên Âu–Mỹ","Phiên","14h–4h giờ Việt Nam (7–21h UTC)"]];
+function features(dir){
+  const C=S.cols, n=C.length; if(n<40) return null;
+  const per=1000/S.speed, mid=c=>(c.bid+c.ask)/2, last=C[n-1], back=sec=>C[Math.max(0,n-1-Math.round(sec*per))];
+  const m0=mid(last), tr=m0-mid(back(600)), cvd=last.cvd-back(60).cvd;
+  let v60=0,vAll=0,first=last; for(let i=n-1;i>=0;i--){ const c=C[i], age=(last.t-c.t)/1000; if(age>600) break; const v=c.buy+c.sell; vAll+=v; if(age<=60) v60+=v; first=c; }
+  const span=Math.max(60,(last.t-first.t)/1000), vol=span>=180&&v60>1.5*vAll*60/span;
+  let bq=0,aq=0; const w=m0*0.0015; for(const [p,q] of S.book.bids) if(p>=m0-w) bq+=q; for(const [p,q] of S.book.asks) if(p<=m0+w) aq+=q;
+  const imb=(bq-aq)/((bq+aq)||1), uh=new Date().getUTCHours();
+  return {trend:dir*tr>0, cvd:dir*cvd>0, book:dir*imb>0.1, vol, sess:uh>=7&&uh<21};
+}
+let ACT={}; try{ ACT=JSON.parse(localStorage.getItem("bm_filt")||"{}")||{}; }catch(e){}
+const passF=o=>{ const ks=Object.keys(ACT).filter(k=>ACT[k]); if(!ks.length) return true; return !!o.f&&ks.every(k=>o.f[k]); };
 function openSignal(setup,dir,ref,why,rr=2){
   if(!S.auto||S.bestBid==null||!S.bucket) return;
   const sym=S.mkt==="demo"?"DEMO":S.sym;
@@ -343,7 +370,7 @@ function openSignal(setup,dir,ref,why,rr=2){
   let sl=dir>0?Math.min(ref-2*B,px-minRisk):Math.max(ref+2*B,px+minRisk);
   const risk=Math.abs(px-sl); if(risk>px*0.012) return;           // SL quá xa thì bỏ
   const tp=px+dir*rr*risk;
-  const o={id:Date.now()+Math.random(),t:Date.now(),chk:Date.now(),mkt:S.mkt,sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open"};
+  const o={id:Date.now()+Math.random(),t:Date.now(),chk:Date.now(),mkt:S.mkt,sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open",f:features(dir)};
   S.sigOpen.push(o); saveSigs();
   addEvent("sig",px,`Lệnh giấy ${SETUP[setup]}: ${dir>0?"MUA":"BÁN"} @ ${fp(px)} · SL ${fp(sl)} · TP ${fp(tp)}`,true);
   renderStats();
@@ -404,11 +431,13 @@ const mmss=ms=>{const s=Math.round(ms/1000); return Math.floor(s/60)+":"+String(
 function renderStats(){
   const D=SD(), el=D.getElementById("st2"); if(!el||el.hidden) return;
   const all=D.getElementById("stsym").value==="all", sym=S.mkt==="demo"?"DEMO":S.sym;
-  const rows=S.sigClosed.filter(o=>all||o.sym===sym), opens=S.sigOpen.filter(o=>all||o.sym===sym);
+  const base=S.sigClosed.filter(o=>all||o.sym===sym), rows=base.filter(passF), opens=S.sigOpen.filter(o=>all||o.sym===sym);
+  const nAct=Object.values(ACT).filter(Boolean).length;
   const sgn=(v,d=2)=>(v>0?"+":"")+v.toFixed(d), cls=v=>v>0?"pos":v<0?"neg":"";
   const st=xs=>{ const n=xs.length, w=xs.filter(o=>o.R>0).length, tot=xs.reduce((a,o)=>a+o.R,0); return {n,w,wr:n?w/n:null,tot,avg:n?tot/n:null}; };
   const A=st(rows), pls=opens.map(livePL).filter(Boolean), plR=pls.reduce((a,p)=>a+p.R,0);
   const kp=(lab,val,c="")=>`<div><span>${lab}</span><b class="${c}">${val}</b></div>`;
+  D.getElementById("stkpi").classList.toggle("on",!!nAct);
   D.getElementById("stkpi").innerHTML=
     kp("Tổng R",A.n?sgn(A.tot,1):"–",cls(A.tot))+kp("Thắng",A.wr==null?"–":Math.round(A.wr*100)+"%")+kp("Số lệnh",A.n)+
     kp("R / lệnh",A.avg==null?"–":sgn(A.avg),cls(A.avg||0));
@@ -417,12 +446,20 @@ function renderStats(){
     const tip=a.n?`TB/lệnh ${sgn(a.avg)}R`:"Chưa có lệnh";
     h+=`<div class="nm" title="${tip}"><i>${k}</i>${SETUP[k].split("· ")[1]}${op?` <span class="tag">${op} mở</span>`:""}</div><div class="r">${a.n||'<span class="mut">0</span>'}</div><div class="r">${a.wr==null?'<span class="mut">–</span>':Math.round(a.wr*100)+"%"}</div><div class="r ${cls(a.tot)}">${a.n?sgn(a.tot,1):'<span class="mut">–</span>'}</div>`; }
   D.getElementById("stsetup").innerHTML=h;
+  // bảng điều kiện lọc: so sánh lệnh ĐẠT và KHÔNG ĐẠT từng điều kiện
+  const fs=D.getElementById("stfset").value, fx=base.filter(o=>o.f&&(!fs||o.setup===fs));
+  const cell=xs=>{ const a=st(xs); return a.n?`${a.n} · ${Math.round(a.wr*100)}% · <span class="${cls(a.avg)}">${sgn(a.avg)}</span>`:'<span class="mut">–</span>'; };
+  let fh='<div class="h">Lọc</div><div class="h">Điều kiện</div><div class="h r">Đạt: lệnh·thắng·R</div><div class="h r">Không đạt</div>';
+  for(const [k,name,,tip] of FILT) fh+=`<label title="${tip}"><input type="checkbox" data-k="${k}" ${ACT[k]?"checked":""}><span class="nm">${name}</span><span class="r">${cell(fx.filter(o=>o.f[k]))}</span><span class="r">${cell(fx.filter(o=>!o.f[k]))}</span></label>`;
+  fh+=`<div class="ft">${fx.length} lệnh có ghi điều kiện. Điều kiện nào mà cột <b>Đạt</b> có R/lệnh cao hơn rõ rệt cột <b>Không đạt</b> (mỗi bên ≥ 30 lệnh) thì mới nên dùng. Tick ô <b>Lọc</b> để các ô số liệu và danh sách chỉ tính lệnh đạt điều kiện${nAct?` — <span class="fbadge">đang lọc ${nAct} điều kiện: ${rows.length}/${base.length} lệnh</span>`:""}.</div>`;
+  const FL=D.getElementById("stflt"); FL.innerHTML=fh;
+  FL.querySelectorAll("input").forEach(cb=>cb.onchange=()=>{ ACT[cb.dataset.k]=cb.checked; try{localStorage.setItem("bm_filt",JSON.stringify(ACT));}catch(e){} renderStats(); });
   // lệnh đang mở
   D.getElementById("stopenh").innerHTML=`<span>Đang mở (${opens.length})</span>${opens.length?`<span class="${cls(plR)}">${sgn(plR)}R</span>`:""}`;
   let oh="";
   for(const o of opens){ const p=livePL(o), up=p&&p.R>=0;
     const prog=p?(p.R>=0?Math.min(1,p.R/(Math.abs(o.tp-o.entry)/o.risk)):Math.min(1,-p.R)):0;
-    oh+=`<div class="oc ${p?(up?"up":"dn"):""}"><div class="l1"><b>${o.setup} · ${o.dir>0?'<span class="pos">MUA</span>':'<span class="neg">BÁN</span>'}${all?" "+o.sym.replace(/USDT$/,""):""}</b><span class="big ${p?cls(p.R):""}">${p?sgn(p.R)+"R":"…"}</span></div>
+    oh+=`<div class="oc ${p?(up?"up":"dn"):""}"><div class="l1"><b style="display:flex;align-items:center">${o.setup} · ${o.dir>0?'<span class="pos">MUA</span>':'<span class="neg">BÁN</span>'}${all?" "+o.sym.replace(/USDT$/,""):""}${o.f?`<span class="chips">${FILT.filter(([k])=>o.f[k]).map(([k,,sh])=>`<span>${sh}</span>`).join("")}</span>`:""}</b><span class="big ${p?cls(p.R):""}">${p?sgn(p.R)+"R":"…"}</span></div>
       <div class="l2"><span>${fp(o.entry)} → ${p?fp(p.px):"…"}${p&&p.src==="1m"?' <span class="mut">(1m)</span>':""}</span><span class="${p?cls(p.pct):""}">${p?sgn(p.pct)+"%":""}</span></div>
       <div class="l3"><span>SL ${fp(o.sl)}</span><span class="plbar"><i class="${up?"pos":"neg"}" style="width:${Math.round(prog*100)}%"></i></span><span>TP ${fp(o.tp)}</span><span>⏱ ${p?mmss(p.left):""}</span></div></div>`; }
   D.getElementById("stopen").innerHTML=oh||'<div class="empty2">Không có lệnh đang mở.</div>';
@@ -786,14 +823,15 @@ $("statbtn").onclick=()=>{ if(S.statWin&&!S.statWin.closed){ S.statWin.focus(); 
   new ResizeObserver(()=>{ if(!p.hidden&&!S.statWin&&p.style.left) save(); }).observe(p); })();
 $("stpop").onclick=()=>{ if(!openStatsWindow()) toast("Trình duyệt đang chặn cửa sổ bật lên. Cho phép ở thanh địa chỉ rồi bấm lại."); };
 
+$("stfset").onchange=()=>renderStats();
 $("stcfg").onclick=()=>{ const D=SD(), c=D.getElementById("stcfgp"); c.hidden=!c.hidden; D.getElementById("stcfg").classList.toggle("on",!c.hidden); };
 $("stx").onclick=()=>{ if(S.statWin&&!S.statWin.closed){ S.statWin.close(); return; } document.getElementById("st2").hidden=true; $("statbtn").classList.remove("on"); };
 $("stsym").onchange=()=>{ renderStats(); toast(document.getElementById("stsym").value==="all"?"Đang xem tất cả các mã":"Đang xem mã hiện tại"); };
 $("fee").onchange=e=>{S.fee=+e.target.value; toast("Phí mới áp dụng cho các lệnh giấy mở từ bây giờ");};
 $("clr").onclick=e=>{ const btn=e.currentTarget; if(btn.dataset.c!=="1"){ btn.dataset.c="1"; btn.textContent="Bấm lần nữa để xóa"; toast("Bấm \"Bấm lần nữa để xóa\" trong 4 giây để xóa hết lệnh giấy"); setTimeout(()=>{btn.dataset.c="";btn.textContent="Xóa dữ liệu";},4000); return; }
   const n=S.sigClosed.length; S.sigClosed=[]; S.sigOpen=[]; saveSigs(); btn.dataset.c=""; btn.textContent="Xóa dữ liệu"; renderStats(); toast(`Đã xóa ${n} lệnh giấy`); };
-$("csv").onclick=()=>{ if(!S.sigClosed.length){ toast("Chưa có lệnh giấy nào đã đóng để xuất"); return; } const head=["gio_vao","gio_ra","ma","setup","huong","vao","sl","tp","thoat","cach_dong","R","ly_do"];
-  const rows=S.sigClosed.map(o=>[new Date(o.t).toISOString(),new Date(o.tx).toISOString(),o.sym,SETUP[o.setup],o.dir>0?"Mua":"Ban",o.entry,o.sl,o.tp,o.exit,o.how,o.R,o.why]);
+$("csv").onclick=()=>{ if(!S.sigClosed.length){ toast("Chưa có lệnh giấy nào đã đóng để xuất"); return; } const head=["gio_vao","gio_ra","ma","setup","huong","vao","sl","tp","thoat","cach_dong","R","ly_do",...FILT.map(f=>"dk_"+f[0])];
+  const rows=S.sigClosed.map(o=>[new Date(o.t).toISOString(),new Date(o.tx).toISOString(),o.sym,SETUP[o.setup],o.dir>0?"Mua":"Ban",o.entry,o.sl,o.tp,o.exit,o.how,o.R,o.why,...FILT.map(f=>o.f?(o.f[f[0]]?1:0):"")]);
   const csv=[head,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv"})); a.download="lenh_giay_bookmap.csv"; document.body.appendChild(a); a.click(); a.remove(); toast(`Đã tải lenh_giay_bookmap.csv (${S.sigClosed.length} lệnh)`); };
 $("hb").onclick=()=>{$("help").hidden=!$("help").hidden;};
