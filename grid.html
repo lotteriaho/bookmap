@@ -49,7 +49,8 @@ try{ const j=JSON.parse(localStorage.getItem("bm_grid")||"null"); if(j&&LAYOUTS[
 const save=()=>{ try{ localStorage.setItem("bm_grid",JSON.stringify(st)); }catch(e){} };
 // link dạng grid.html#sync=URL: lưu URL Google Sheet và chuyển cho từng ô
 let SYNC=""; try{ SYNC=new URLSearchParams(location.hash.slice(1)).get("sync")||localStorage.getItem("bm_sync")||""; if(SYNC) localStorage.setItem("bm_sync",SYNC); }catch(e){}
-const src=(i,sym)=>`index.html?embed=1&cell=${i}&sym=${encodeURIComponent(sym)}${SYNC?"#sync="+encodeURIComponent(SYNC):""}`;
+const BOOT=Date.now();   // tránh trình duyệt dùng bản index.html cũ còn trong bộ nhớ đệm (GitHub Pages giữ 10 phút)
+const src=(i,sym)=>`index.html?embed=1&v=${BOOT}&cell=${i}&sym=${encodeURIComponent(sym)}${SYNC?"#sync="+encodeURIComponent(SYNC):""}`;
 const $=id=>document.getElementById(id), G=$("grid");
 let msgT=0; const msg=t=>{ $("msg").textContent=t; clearTimeout(msgT); msgT=setTimeout(()=>{$("msg").textContent="";},6000); };
 
