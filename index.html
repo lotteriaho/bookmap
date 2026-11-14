@@ -53,6 +53,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 [hidden]{display:none!important}
 #st2 .cfg label{display:flex;gap:6px;align-items:center;color:var(--mut);font-size:11px}
 #st2 .cfg details{flex-basis:100%}
+#st2 .sync{flex-basis:100%;display:flex;flex-direction:column;gap:5px;border-top:1px solid var(--line);padding-top:8px}
+#st2 .sync .rh{font-size:12px} #st2 .sync input{width:100%;font:11.5px var(--mono)} #st2 .sync .row{display:flex;gap:6px;flex-wrap:wrap}
+#st2 .sync code{font-size:11px;color:var(--fg)}
 #st2 .rules{flex-basis:100%;display:grid;grid-template-columns:auto auto auto;gap:5px 10px;align-items:center;font-size:11.5px;color:var(--mut)}
 #st2 .rules .rh{grid-column:1/-1;color:var(--fg);font-size:12px}
 #st2 .rules label{display:flex;gap:5px;align-items:center;color:var(--fg);font-size:11.5px;text-transform:none;letter-spacing:0}
@@ -169,6 +172,18 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
         <span>Đứng ≥ <select data-r="pullAge"><option value="15">15 s</option><option value="30">30 s</option><option value="60">60 s</option><option value="120">2 phút</option></select></span>
         <label><input type="checkbox" data-r="onD" checked><b>D · Sau thanh lý</b></label>
         <span>Cụm thanh lý ≥ <select data-r="liqMinD"><option value="250000">250k</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="3000000">3 tr</option><option value="10000000">10 tr</option></select></span><span></span>
+      </div>
+      <div class="sync" id="stsync">
+        <div class="rh">Sao lưu lệnh giấy <span class="mut" id="synst"></span></div>
+        <input id="syncurl" placeholder="Dán URL ứng dụng web Google Apps Script (…/exec)" spellcheck="false" autocomplete="off">
+        <div class="row"><button id="syncsave">Lưu & đồng bộ</button><button id="syncnow">Đồng bộ ngay</button><button id="csvin">Nhập CSV</button><input type="file" id="csvfile" accept=".csv,text/csv" hidden></div>
+        <details class="note"><summary>Cách tạo Google Sheet để lưu (làm 1 lần, ~3 phút)</summary>
+          1. Tạo một Google Sheet mới → menu <b>Tiện ích mở rộng → Apps Script</b>.<br>
+          2. Xoá hết mã có sẵn, bấm <button id="gscopy" type="button">Sao chép mã</button> rồi dán vào → bấm 💾 Lưu.<br>
+          3. <b>Triển khai → Triển khai mới</b> → bánh răng chọn <b>Ứng dụng web</b> → Thực thi dưới dạng: <b>Tôi</b> → Ai có quyền truy cập: <b>Bất kỳ ai</b> → Triển khai → cho phép quyền truy cập.<br>
+          4. Chép <b>URL ứng dụng web</b> (đuôi <code>/exec</code>) dán vào ô trên → <b>Lưu & đồng bộ</b>.<br>
+          Từ đó mỗi lệnh đóng tự ghi lên Sheet; mở trang ở bất kỳ máy/trình duyệt nào, dán cùng URL là lấy lại toàn bộ lệnh. Không cần mật khẩu hay API key — nhưng đừng chia sẻ URL này.<br>
+          Mẹo: lưu dấu trang <code>grid.html#sync=URL</code> để trình duyệt có bị xoá dữ liệu thì mở lên vẫn tự nối lại.</details>
       </div>
       <details class="note"><summary>Cách tool tạo và chấm lệnh giấy</summary>Mỗi sự kiện đủ điều kiện tự tạo một <b>lệnh giấy</b> (không đặt lệnh thật): vào ở giá hiện tại, SL sau mức giá của sự kiện, TP = 2R (setup D: 1,5R), tối đa 30 phút rồi đóng theo giá. R đã trừ phí + trượt khứ hồi. Dữ liệu lưu trong trình duyệt này, kể cả khi tắt trang.<br>
       <b>A · Bật tường</b>: hấp thụ ■ → vào ngược lực đánh. <b>B · Phá tường</b>: tường bị ăn ⇡ → đi theo hướng phá. <b>C · Rút tường</b>: tường bị rút ✕ → đi theo hướng giá đang tới. <b>D · Sau thanh lý</b>: cụm thanh lý một phía đã dứt 30 giây → vào ngược lại.</details>
@@ -919,6 +934,52 @@ async function backfill(kind,from,to,gen){
 document.addEventListener("visibilitychange",()=>{ if(document.hidden){ saveHist(); touchSigs(); } });
 window.addEventListener("pagehide",()=>{ saveHist(); touchSigs(); });
 
+// ---------- sao lưu: Google Sheet (Apps Script) + nhập CSV ----------
+const GS_CODE="/**\n * L\u01b0u l\u1ec7nh gi\u1ea5y c\u1ee7a Bookmap mini v\u00e0o Google Sheet.\n * C\u00e1ch c\u00e0i: m\u1edf Google Sheet m\u1edbi \u2192 Ti\u1ec7n \u00edch m\u1edf r\u1ed9ng \u2192 Apps Script \u2192 xo\u00e1 h\u1ebft, d\u00e1n to\u00e0n b\u1ed9 file n\u00e0y \u2192 L\u01b0u\n * \u2192 Tri\u1ec3n khai \u2192 Tri\u1ec3n khai m\u1edbi \u2192 Lo\u1ea1i: \u1ee8ng d\u1ee5ng web \u2192 Th\u1ef1c thi d\u01b0\u1edbi d\u1ea1ng: T\u00f4i \u2192 Ai c\u00f3 quy\u1ec1n truy c\u1eadp: B\u1ea5t k\u1ef3 ai\n * \u2192 Tri\u1ec3n khai \u2192 c\u1ea5p quy\u1ec1n \u2192 ch\u00e9p \"URL \u1ee9ng d\u1ee5ng web\" (\u2026/exec) d\u00e1n v\u00e0o Bookmap: \u2699 \u2192 \u0110\u1ed3ng b\u1ed9 Google Sheet.\n * Kh\u00f4ng c\u1ea7n m\u1eadt kh\u1ea9u hay API key. Ai c\u00f3 URL n\u00e0y \u0111\u1ec1u ghi/\u0111\u1ecdc \u0111\u01b0\u1ee3c sheet, n\u00ean \u0111\u1eebng chia s\u1ebb URL.\n */\nconst SHEET_NAME = 'lenh_giay';\nconst HEAD = ['id', 'json', 'gio_vao', 'ma', 'setup', 'huong', 'vao', 'thoat', 'cach_dong', 'R'];\n\nfunction sheet_() {\n  const ss = SpreadsheetApp.getActiveSpreadsheet();\n  let sh = ss.getSheetByName(SHEET_NAME);\n  if (!sh) { sh = ss.insertSheet(SHEET_NAME); sh.appendRow(HEAD); sh.setFrozenRows(1); sh.hideColumns(2); }\n  return sh;\n}\nfunction out_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }\n\n// Trang Bookmap g\u1ecdi GET khi m\u1edf \u0111\u1ec3 l\u1ea5y l\u1ea1i to\u00e0n b\u1ed9 l\u1ec7nh c\u0169\nfunction doGet() {\n  const sh = sheet_(), n = sh.getLastRow() - 1, trades = [];\n  if (n > 0) for (const [js] of sh.getRange(2, 2, n, 1).getValues()) { try { trades.push(JSON.parse(js)); } catch (e) {} }\n  return out_({ ok: true, trades });\n}\n\n// Trang Bookmap g\u1eedi POST c\u00e1c l\u1ec7nh m\u1edbi \u0111\u00f3ng; l\u1ec7nh tr\u00f9ng id \u0111\u01b0\u1ee3c b\u1ecf qua\nfunction doPost(e) {\n  const lock = LockService.getScriptLock(); lock.waitLock(20000);\n  try {\n    const body = JSON.parse(e.postData.contents || '{}'), sh = sheet_(), n = sh.getLastRow() - 1;\n    const ids = new Set(n > 0 ? sh.getRange(2, 1, n, 1).getValues().map(r => String(r[0])) : []);\n    const rows = [];\n    for (const o of body.trades || []) {\n      if (!o || o.id == null) continue; const id = String(o.id); if (ids.has(id)) continue; ids.add(id);\n      rows.push([\"'\" + id, JSON.stringify(o), new Date(o.t), o.sym, o.setup, o.dir > 0 ? 'Mua' : 'Ban', o.entry, o.exit, o.how, o.R]);\n    }\n    if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, HEAD.length).setValues(rows);\n    return out_({ ok: true, added: rows.length, total: ids.size });\n  } finally { lock.releaseLock(); }\n}\n";
+const SYNC={url:"",busy:false,lastErr:""};
+try{ const h=new URLSearchParams(location.hash.slice(1)).get("sync")||new URLSearchParams(location.search).get("sync");
+  SYNC.url=h||localStorage.getItem("bm_sync")||""; if(h) localStorage.setItem("bm_sync",h); }catch(e){}
+const syncedIds=()=>{ try{ return new Set(JSON.parse(localStorage.getItem("bm_synced")||"[]")); }catch(e){ return new Set(); } };
+const saveSynced=set=>{ try{ localStorage.setItem("bm_synced",JSON.stringify([...set].slice(-20000))); }catch(e){} };
+function synStatus(t,c){ const D=SD(), el=D.getElementById("synst"); if(el){ el.textContent=t; el.className=c||"mut"; } }
+// gộp lệnh lấy từ nơi khác (Sheet, CSV, kho IndexedDB) vào bộ nhớ, bỏ lệnh trước lúc bấm "Xóa dữ liệu"
+function importTrades(list){ let ct=0; try{ ct=+(localStorage.getItem("bm_clearT")||0); }catch(e){}
+  const have=new Set(S.sigClosed.map(o=>String(o.id))); let n=0;
+  for(const o of list){ if(!o||o.id==null||o.R==null||(o.t||0)<ct||have.has(String(o.id))) continue; have.add(String(o.id)); o.status="closed"; S.sigClosed.push(o); n++; }
+  if(n){ saveSigs(); for(const o of list) archiveTrade(o); renderStats(); } return n; }
+async function syncPull(){ if(!SYNC.url) return 0;
+  const r=await fetch(SYNC.url,{cache:"no-store",redirect:"follow"}); const j=await r.json(); if(!j.ok) throw new Error("Sheet trả lỗi");
+  const n=importTrades(j.trades||[]); const sy=syncedIds(); for(const o of j.trades||[]) sy.add(String(o.id)); saveSynced(sy); return n; }
+async function syncPush(){ if(!SYNC.url) return 0; const sy=syncedIds(), todo=S.sigClosed.filter(o=>!sy.has(String(o.id))).slice(0,400); if(!todo.length) return 0;
+  const r=await fetch(SYNC.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({trades:todo}),redirect:"follow"});
+  const j=await r.json(); if(!j.ok) throw new Error("Sheet trả lỗi"); for(const o of todo) sy.add(String(o.id)); saveSynced(sy); return todo.length; }
+async function syncAll(manual){ if(!SYNC.url||SYNC.busy) return; SYNC.busy=true; synStatus("đang đồng bộ…");
+  try{ const a=await syncPull(), b=await syncPush(); SYNC.lastErr=""; synStatus(`✓ đồng bộ lúc ${new Date().toLocaleTimeString("vi-VN",{hour12:false})}`,"pos");
+    if(manual||a) toast(`Google Sheet: lấy về ${a} lệnh, gửi lên ${b} lệnh`); }
+  catch(e){ SYNC.lastErr=String(e.message||e); synStatus("✗ chưa đồng bộ được — kiểm tra URL / quyền 'Bất kỳ ai'","neg"); if(manual) toast("Không đồng bộ được với Google Sheet: "+SYNC.lastErr); }
+  SYNC.busy=false; }
+// đẩy ngay khi đóng trang (sendBeacon vẫn gửi được lúc tab đóng)
+window.addEventListener("pagehide",()=>{ if(!SYNC.url) return; const sy=syncedIds(), todo=S.sigClosed.filter(o=>!sy.has(String(o.id))).slice(0,200);
+  if(todo.length&&navigator.sendBeacon) try{ navigator.sendBeacon(SYNC.url,new Blob([JSON.stringify({trades:todo})],{type:"text/plain"})); }catch(e){} });
+function parseCSV(t){ const rows=[]; let row=[], f="", q=false;
+  for(let i=0;i<t.length;i++){ const c=t[i];
+    if(q){ if(c==='"'){ if(t[i+1]==='"'){ f+='"'; i++; } else q=false; } else f+=c; }
+    else if(c==='"') q=true; else if(c===","){ row.push(f); f=""; } else if(c==="\n"||c==="\r"){ if(c==="\r"&&t[i+1]==="\n") i++; row.push(f); rows.push(row); row=[]; f=""; } else f+=c; }
+  if(f!==""||row.length){ row.push(f); rows.push(row); } return rows; }
+function csvToTrades(text){ const R=parseCSV(text.replace(/^﻿/,"")); if(R.length<2) return [];
+  const H=R[0].map(h=>h.trim()), ix=k=>H.indexOf(k), num=v=>v===""||v==null?undefined:+v, out=[];
+  const SETK=Object.fromEntries(Object.entries(SETUP).map(([k,v])=>[v,k]));
+  for(const r of R.slice(1)){ if(r.length<5) continue; const g=k=>{ const i=ix(k); return i<0?"":r[i]; };
+    const t=Date.parse(g("gio_vao")), tx=Date.parse(g("gio_ra")); if(!isFinite(t)) continue;
+    const o={id:g("id")?+g("id"):t+Math.random(),t,tx:isFinite(tx)?tx:t,mkt:g("san")||"fut",sym:g("ma"),setup:SETK[g("setup")]||g("setup"),dir:g("huong")==="Mua"?1:-1,
+      entry:+g("vao"),sl:+g("sl"),tp:+g("tp"),exit:+g("thoat"),how:g("cach_dong"),R:+g("R"),fee:num(g("phi"))??S.fee,why:g("ly_do"),status:"closed",
+      sz:num(g("do_lon_usd")),rest:num(g("tuong_dung_usd")),age:num(g("tuong_dung_giay")),mfe:num(g("mfe_R")),tmfe:num(g("giay_toi_mfe")),mae:num(g("mae_R")),tmae:num(g("giay_toi_mae"))};
+    o.risk=num(g("rui_ro"))??Math.abs(o.entry-o.sl);
+    if(g("dk_trend")!==""&&ix("dk_trend")>=0) o.f=Object.fromEntries(FILT.map(f=>[f[0],g("dk_"+f[0])==="1"]));
+    const raw={}; for(const k of ["xh10_pct","cvd60_usd","so_lech","kl_x","gio_utc","spread_bps","bien_dong5_pct"]) if(g(k)!=="") raw[k]=+g(k); if(Object.keys(raw).length) o.raw=raw;
+    if(o.sym&&isFinite(o.R)) out.push(o); }
+  return out; }
+
 // ---------- demo data ----------
 function startDemo(fromFail){
   stopAll(); resetData(); HIST.key=null; S.sym="BTCUSDT"; $("symin").value="BTCUSDT"; S.tick=0.1; const gen=S.gen; $("sym").textContent="BTCUSDT · Dữ liệu mẫu";
@@ -984,6 +1045,15 @@ $("statbtn").onclick=()=>{ if(S.statWin&&!S.statWin.closed){ S.statWin.focus(); 
 $("stpop").onclick=()=>{ if(!openStatsWindow()) toast("Trình duyệt đang chặn cửa sổ bật lên. Cho phép ở thanh địa chỉ rồi bấm lại."); };
 
 $("stfset").onchange=()=>renderStats();
+$("syncurl").value=SYNC.url;
+$("syncsave").onclick=()=>{ const u=$("syncurl").value.trim(); if(u&&!/^https:\/\/script\.google(usercontent)?\.com\//.test(u)){ toast("URL phải bắt đầu bằng https://script.google.com/…/exec"); return; }
+  SYNC.url=u; try{ u?localStorage.setItem("bm_sync",u):localStorage.removeItem("bm_sync"); }catch(e){} if(u) syncAll(true); else { synStatus("đã tắt đồng bộ"); toast("Đã tắt đồng bộ Google Sheet"); } };
+$("syncnow").onclick=()=>{ if(!SYNC.url){ toast("Chưa có URL Google Sheet — xem hướng dẫn bên dưới"); return; } syncAll(true); };
+$("csvin").onclick=()=>$("csvfile").click();
+$("csvfile").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; const list=csvToTrades(await f.text()); const n=importTrades(list); e.target.value="";
+  toast(list.length?`Đã nhập ${n} lệnh mới từ ${f.name} (${list.length-n} lệnh đã có sẵn)`:"File không đúng định dạng CSV xuất từ Bookmap"); if(n&&SYNC.url) syncAll(false); };
+$("gscopy").onclick=async()=>{ try{ await navigator.clipboard.writeText(GS_CODE); toast("Đã sao chép mã Apps Script — dán vào trình soạn thảo Apps Script"); }
+  catch(e){ const w=window.open("","_blank"); if(w){ w.document.body.innerText=GS_CODE; } else toast("Không sao chép được — mở file apps_script.gs trong repo GitHub"); } };
 document.querySelectorAll("#strules [data-r]").forEach(el=>{ const k=el.dataset.r;
   if(el.type==="checkbox") el.checked=!!RULE[k]; else el.value=String(RULE[k]);
   el.onchange=()=>{ RULE[k]=el.type==="checkbox"?el.checked:+el.value; try{localStorage.setItem("bm_rules",JSON.stringify(RULE));}catch(e){} toast("Đã lưu điều kiện vào lệnh — áp dụng cho lệnh mới"); }; });
@@ -1014,7 +1084,10 @@ ov.addEventListener("pointermove",e=>{ if(!drag||S.center==null) return; const d
 ov.addEventListener("pointerup",()=>{drag=null;});
 
 // ---------- boot ----------
-resize(); loadSigs(); setTimeout(()=>{ for(const o of S.sigClosed) archiveTrade(o); },3000); setTimeout(()=>resolveOpen(true),1500); startClock(); requestAnimationFrame(frame); let lastRS=0; setInterval(()=>{ const n=Date.now(); if(S.sigOpen.length||n-lastRS>5000){ lastRS=n; renderStats(); } },1000);
+resize(); loadSigs();
+setTimeout(async()=>{ const n=importTrades(await allTrades()); if(n) toast(`Đã khôi phục ${n} lệnh từ kho lưu trong trình duyệt`); for(const o of S.sigClosed) archiveTrade(o);
+  if(SYNC.url){ await syncAll(false); setInterval(()=>syncAll(false),60000); } },1200);
+try{ navigator.storage&&navigator.storage.persist&&navigator.storage.persist(); }catch(e){} setTimeout(()=>resolveOpen(true),1500); startClock(); requestAnimationFrame(frame); let lastRS=0; setInterval(()=>{ const n=Date.now(); if(S.sigOpen.length||n-lastRS>5000){ lastRS=n; renderStats(); } },1000);
 const q=new URLSearchParams(location.search);
 const EMBED=q.get("embed")==="1", CELL=+(q.get("cell")||0);
 const toParent=m=>{ if(EMBED&&window.parent!==window) try{ window.parent.postMessage({bm:1,cell:CELL,...m},"*"); }catch(e){} };
