@@ -138,7 +138,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
     <button id="follow" class="on" title="Tự bám theo giá">Bám giá</button>
     <label>Tường ≥ <select id="wallmin"><option value="0" selected>Tự động</option><option value="250000">250k</option><option value="1000000">1 tr</option><option value="3000000">3 tr</option><option value="10000000">10 tr</option></select> USD</label>
     <label>Thanh lý ≥ <select id="liqmin"><option value="5000">5k</option><option value="20000">20k</option><option value="50000" selected>50k</option><option value="250000">250k</option></select> USD</label>
-    <button id="snd" title="Bật âm báo sự kiện">🔕 Âm báo</button>
+    <button id="snd" title="Một tiếng ting khi có lệnh kèo thử nghiệm (A chuẩn, E/F, D)">🔕 Âm báo</button>
     <button id="hb" title="Cách đọc">?</button>
     <button id="autobtn" class="on" title="Tự tạo lệnh giấy từ sự kiện">🤖 Lệnh giấy: Bật</button>
     <button id="statbtn" title="Thống kê lệnh giấy">📊 Thống kê</button>
@@ -178,7 +178,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
       <div class="sync" id="stsync">
         <div class="rh">Sao lưu lệnh giấy <span class="mut" id="synst"></span></div>
         <input id="syncurl" placeholder="Dán URL ứng dụng web Google Apps Script (…/exec)" spellcheck="false" autocomplete="off">
-        <label style="text-transform:none;letter-spacing:0;font-size:11.5px;color:var(--fg)"><input type="checkbox" data-r="tgA" checked> Báo Telegram mỗi lệnh <b>kèo A chuẩn</b> (vào + đóng) — cần cài TG_TOKEN, TG_CHAT trong Apps Script</label>
+        <label style="text-transform:none;letter-spacing:0;font-size:11.5px;color:var(--fg)"><input type="checkbox" data-r="tgA" checked> Báo Telegram mỗi lệnh <b>kèo thử nghiệm</b> (A chuẩn, E/F, D — vào + đóng) — cần cài TG_TOKEN, TG_CHAT trong Apps Script</label>
         <div class="row"><button id="syncsave">Lưu & đồng bộ</button><button id="syncnow">Đồng bộ ngay</button><button id="csvin">Nhập CSV</button><input type="file" id="csvfile" accept=".csv,text/csv" hidden></div>
         <details class="note"><summary>Cách tạo Google Sheet để lưu (làm 1 lần, ~3 phút)</summary>
           1. Tạo một Google Sheet mới → menu <b>Tiện ích mở rộng → Apps Script</b>.<br>
@@ -196,6 +196,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
       <div class="kpi" id="stkpi"></div>
       <div class="setups" id="stsetup"></div>
       <div class="h1" id="sth2"></div>
+      <div class="h1" id="sth3"></div>
       <div class="h1" id="sth1"></div>
       <div class="sec"><span>Điều kiện lọc</span><select id="stfset" title="Xem theo setup"><option value="">Mọi setup</option><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option></select></div>
       <div class="flt" id="stflt"></div>
@@ -300,7 +301,7 @@ const vnTime=t=>new Date(t).toLocaleTimeString("vi-VN",{hour12:false});
 function addEvent(type,price,text,beep){
   const n=S.colN; S.marks.push({type,price,n}); if(S.marks.length>400) S.marks.shift();
   S.events.unshift({t:Date.now(),type,price,text}); if(S.events.length>60) S.events.pop();
-  renderEvents(); if(beep) playBeep(type);
+  renderEvents(); if(beep==="keo") playBeep();      // chỉ kêu khi vào lệnh kèo đang theo dõi
 }
 const ICON={wall:"▮",pull:"✕",brk:"⇡",absb:"■",abss:"■",liql:"◆",liqs:"◆",sig:"➤",win:"✔",loss:"✖"};
 const ICOL={wall:"#f4b43a",pull:"#c792ea",brk:"#f4b43a",absb:"#22c58b",abss:"#ef5350",liql:"#b37cff",liqs:"#ff9f43",sig:"#4fc3f7",win:"#22c58b",loss:"#ef5350"};
@@ -312,12 +313,12 @@ function renderEvents(){
     const tx=document.createElement("span"); tx.textContent=e.text;
     d.append(tm,ic,tx); d.onclick=()=>{S.follow=false;$("follow").classList.remove("on");S.center=e.price;S.dirty=true;}; el.appendChild(d);}
 }
-function playBeep(type){
-  if(!S.sound||!S.actx) return; const now=performance.now(); if(now-S.lastBeep<1200) return; S.lastBeep=now;
-  const f={pull:520,brk:780,absb:660,abss:440,liql:330,liqs:880,wall:600}[type]||600;
-  const o=S.actx.createOscillator(), g=S.actx.createGain(); o.frequency.value=f; o.type="sine";
-  g.gain.setValueAtTime(0.0001,S.actx.currentTime); g.gain.exponentialRampToValueAtTime(0.25,S.actx.currentTime+0.02); g.gain.exponentialRampToValueAtTime(0.0001,S.actx.currentTime+0.35);
-  o.connect(g).connect(S.actx.destination); o.start(); o.stop(S.actx.currentTime+0.4);
+// một âm duy nhất, dễ nhận: tiếng "ting" cao, ngân ~0,8 s — chỉ phát khi có lệnh kèo thử nghiệm
+function playBeep(){
+  if(!S.sound||!S.actx) return; const now=performance.now(); if(now-S.lastBeep<1500) return; S.lastBeep=now;
+  const t=S.actx.currentTime, o=S.actx.createOscillator(), g=S.actx.createGain(); o.type="triangle"; o.frequency.value=1318.5;
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.35,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+0.8);
+  o.connect(g).connect(S.actx.destination); o.start(t); o.stop(t+0.85);
 }
 function tradedSince(k,n0){ // aggressive volume at bucket k (±1) since column n0
   let v=0; for(let i=S.cols.length-1;i>=0&&S.cols[i].n>=n0;i--){ const tr=S.cols[i].trades; for(const kk of [k-1,k,k+1]){const e=tr.get(kk); if(e) v+=e.b+e.s;} } return v;
@@ -473,7 +474,9 @@ const nActive=()=>FILT.filter(f=>ACT[f[0]]).length+(ACT._set?1:0)+(ACT._sym?1:0)
 const isH1=o=>o.setup==="A"&&(o.sym==="BTCUSDT"||o.sym==="ETHUSDT")&&!!o.f&&o.f.book&&!o.f.trend;
 // Kèo 2 (tìm ra 14/11 tối bằng mô phỏng lại 110 lệnh trên giá 1 giây): đánh ngược B/C
 const isK2=o=>(o.setup==="E"||o.setup==="F")&&o.r0!=null;   // chỉ tính bản 2 (có xác nhận)
-const isWatch=o=>isH1(o)||isK2(o);
+const isK3=o=>o.setup==="D";
+const isWatch=o=>isH1(o)||isK2(o)||isK3(o);
+let K3T=0; try{ K3T=+(localStorage.getItem("bm_k3")||0); if(!K3T){ K3T=Date.now(); localStorage.setItem("bm_k3",String(K3T)); } }catch(e){ K3T=Date.now(); }
 let K2T=0; try{ K2T=+(localStorage.getItem("bm_k2b")||0); if(!K2T){ K2T=Date.now(); localStorage.setItem("bm_k2b",String(K2T)); } }catch(e){ K2T=Date.now(); }
 let H1T=0; try{ H1T=+(localStorage.getItem("bm_h1")||0); if(!H1T){ H1T=Date.now(); localStorage.setItem("bm_h1",String(H1T)); } }catch(e){ H1T=Date.now(); }
 // SL mà một lệnh hướng dir vào ở px sẽ dùng khi mốc là ref (giống B/C gốc)
@@ -508,7 +511,7 @@ function openSignal(setup,dir,ref,why,rr=2,info={}){
   const tp=px+dir*rr*risk;
   const o={id:Date.now()+Math.random(),t:Date.now(),chk:Date.now(),mkt:S.mkt,sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open",...(F0?{f:F0.b,raw:F0.raw}:{}),sz:info.sz||0,rest:info.rest,age:info.age,...(info.hold?{hold:info.hold}:{}),...(info.r0?{r0:info.r0}:{})};
   S.sigOpen.push(o); saveSigs(); try{ tgOpen(o); }catch(e){}
-  addEvent("sig",px,`Lệnh giấy ${SETUP[setup]}: ${dir>0?"MUA":"BÁN"} @ ${fp(px)} · SL ${fp(sl)} · TP ${fp(tp)}`,true);
+  addEvent("sig",px,`Lệnh giấy ${SETUP[setup]}: ${dir>0?"MUA":"BÁN"} @ ${fp(px)} · SL ${fp(sl)} · TP ${fp(tp)}`,isWatch(o)?"keo":false);
   renderStats();
   return "";
 }
@@ -636,6 +639,13 @@ function renderStats(){
       <div class="ft">${ok2?'<span class="pos">✔ Đạt: ≥ 30 lệnh mới, thắng ≥ 60%, ≥ +0,15R/lệnh.</span>':bad2?'<span class="neg">✘ Không đạt trên dữ liệu mới.</span>':`Cần ~${need2} lệnh mới (đang ${a3.n}). Đạt khi thắng ≥ 60% và ≥ +0,15R/lệnh.`}</div>
       <button id="h2view">Xem các lệnh kèo này</button>`;
     D.getElementById("h2view").onclick=()=>{ ACT={}; D.getElementById("stfset").value=""; try{localStorage.setItem("bm_filt","{}");}catch(e){} D.getElementById("stsym").value="all"; renderStats(); toast("Bảng setup: xem dòng E và F"); }; }
+  { const all4=S.sigClosed.filter(isK3), a4=st(all4.filter(o=>o.t>=K3T)), b4=st(all4.filter(o=>o.t<K3T)), need3=30, ok3=a4.n>=30&&a4.wr>=0.6&&a4.avg>=0.15, bad3=a4.n>=30&&!ok3;
+    const opD=S.sigOpen.filter(isK3).length;
+    D.getElementById("sth3").innerHTML=`<div class="h1t"><b>Kèo thử nghiệm 3: Sau thanh lý (D)</b><span class="mut">Cụm thanh lý một phía dứt 30 giây → vào ngược lại · TP 1,5R · tối đa 30 phút · mọi mã</span></div>
+      <div class="h1g"><div><span>Dữ liệu mới (từ ${new Date(K3T).toLocaleString("vi-VN",{hour12:false,day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})})</span><b class="${a4.n?cls(a4.avg):""}">${a4.n?`${a4.n} lệnh · ${Math.round(a4.wr*100)}% · ${sgn(a4.avg)}R`:"chưa có lệnh"}${opD?` <span class="tag">${opD} mở</span>`:""}</b></div>
+      <div><span>Trước mốc (dùng để tìm ra kèo này)</span><b class="mut">${b4.n?`${b4.n} lệnh · ${Math.round(b4.wr*100)}% · ${sgn(b4.avg)}R`:"–"}</b></div></div>
+      <div class="h1p"><i style="width:${Math.min(100,a4.n/need3*100)}%"></i></div>
+      <div class="ft">${ok3?'<span class="pos">✔ Đạt: ≥ 30 lệnh mới, thắng ≥ 60%, ≥ +0,15R/lệnh.</span>':bad3?'<span class="neg">✘ Không đạt trên dữ liệu mới.</span>':`Cần ~${need3} lệnh mới (đang ${a4.n}). Đạt khi thắng ≥ 60% và ≥ +0,15R/lệnh. Lưu ý: BTC và ETH thường bị thanh lý cùng lúc nên hay ra cặp lệnh giống nhau.`}</div>`; }
   // lệnh đang mở
   D.getElementById("stopenh").innerHTML=`<span>Đang mở (${opens.length})</span>${opens.length?`<span class="${cls(plR)}">${sgn(plR)}R</span>`:""}`;
   let oh="";
@@ -1126,7 +1136,7 @@ $("evmin").onclick=e=>{const m=$("ev").classList.toggle("min"); e.target.textCon
 $("wallmin").onchange=e=>{S.wallMin=+e.target.value; S.walls.clear();};
 $("liqmin").onchange=e=>{S.liqMin=+e.target.value;};
 $("snd").onclick=e=>{ S.sound=!S.sound; if(S.sound&&!S.actx){ try{ S.actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(err){ S.sound=false; } }
-  if(S.actx&&S.actx.state==="suspended") S.actx.resume(); e.target.textContent=S.sound?"🔔 Âm báo":"🔕 Âm báo"; e.target.classList.toggle("on",S.sound); if(S.sound){S.lastBeep=0;playBeep("wall");} };
+  if(S.actx&&S.actx.state==="suspended") S.actx.resume(); e.target.textContent=S.sound?"🔔 Âm báo":"🔕 Âm báo"; e.target.classList.toggle("on",S.sound); if(S.sound){S.lastBeep=0;playBeep();} };
 ov.addEventListener("wheel",e=>{e.preventDefault(); S.rowPx=Math.min(24,Math.max(1,S.rowPx*(e.deltaY<0?1.15:1/1.15))); S.dirty=true;},{passive:false});
 let drag=null;
 ov.addEventListener("pointerdown",e=>{drag={y:e.clientY,c:S.center}; ov.setPointerCapture(e.pointerId);});
