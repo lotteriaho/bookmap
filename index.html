@@ -520,14 +520,19 @@ function renderStats(){
     oh+=`<div class="oc ${p?(up?"up":"dn"):""}"><div class="l1"><b style="display:flex;align-items:center">${o.setup} · ${o.dir>0?'<span class="pos">MUA</span>':'<span class="neg">BÁN</span>'}${all?" "+o.sym.replace(/USDT$/,""):""}${o.f?`<span class="chips">${FILT.filter(([k])=>o.f[k]).map(([k,,sh])=>`<span>${sh}</span>`).join("")}</span>`:""}</b><span class="big ${p?cls(p.R):""}">${p?sgn(p.R)+"R":"…"}</span></div>
       <div class="l2"><span>${fp(o.entry)} → ${p?fp(p.px):"…"}${p&&p.src==="1m"?' <span class="mut">(1m)</span>':""}</span><span class="${p?cls(p.pct):""}">${p?sgn(p.pct)+"%":""}</span></div>
       <div class="l3"><span>SL ${fp(o.sl)}</span><span class="plbar"><i class="${up?"pos":"neg"}" style="width:${Math.round(prog*100)}%"></i></span><span>TP ${fp(o.tp)}</span><span>⏱ ${p?mmss(p.left):""}</span></div></div>`; }
-  D.getElementById("stopen").innerHTML=oh||'<div class="empty2">Không có lệnh đang mở.</div>';
+  const otherOpen=S.sigOpen.length-opens.length;
+  D.getElementById("stopen").innerHTML=oh||`<div class="empty2">Không có lệnh đang mở${otherOpen?` ở ${sym} — có ${otherOpen} lệnh mở ở mã khác, chọn <b>Tất cả mã</b> để xem`:""}.</div>`;
   // lệnh đã đóng
-  D.getElementById("stclh").innerHTML=`<span>Đã đóng (${rows.length})</span><span>60 lệnh gần nhất</span>`;
+  D.getElementById("stclh").innerHTML=`<span>Đã đóng (${nAct?rows.length+"/"+base.length+" · đang lọc":rows.length})</span><span>${rows.length>60?"hiện 60 lệnh gần nhất":""}</span>`;
   let ch="";
   for(const o of rows.slice(-60).reverse()){
     const tag=/TP/.test(o.how)?'<span class="tag tp">TP</span>':/SL/.test(o.how)?'<span class="tag sl">SL</span>':'<span class="tag">30′</span>';
     ch+=`<div class="mut">${new Date(o.t).toLocaleTimeString("vi-VN",{hour12:false,hour:"2-digit",minute:"2-digit"})}</div><div><b>${o.setup}</b> ${o.dir>0?'<span class="pos">▲</span>':'<span class="neg">▼</span>'}${all?' <span class="mut">'+o.sym.replace(/USDT$/,"")+"</span>":""}</div><div class="px" title="${o.how}">${fp(o.entry)} → ${fp(o.exit)}</div><div>${tag}</div><div class="rr ${cls(o.R)}">${sgn(o.R)}</div>`; }
-  D.getElementById("stclosed").innerHTML=ch?`<div class="cl">${ch}</div>`:'<div class="empty2">Chưa có lệnh đóng. Để trang chạy, mỗi sự kiện đủ điều kiện sẽ tự tạo lệnh.</div>';
+  let why="Chưa có lệnh đóng. Để trang chạy, mỗi sự kiện đủ điều kiện sẽ tự tạo lệnh.";
+  if(!ch&&nAct&&base.length) why=`Có ${base.length} lệnh nhưng đang bị ẩn vì bộ lọc điều kiện. <button class="unf2">Bỏ lọc</button>`;
+  else if(!ch&&!all&&S.sigClosed.length) why=`Chưa có lệnh đóng ở ${sym}. Có ${S.sigClosed.length} lệnh ở mã khác (${[...new Set(S.sigClosed.map(o=>o.sym.replace(/USDT$/,"")))].slice(0,5).join(", ")}) — chọn <b>Tất cả mã</b> ở ô trên cùng để xem.`;
+  D.getElementById("stclosed").innerHTML=ch?`<div class="cl">${ch}</div>`:`<div class="empty2">${why}</div>`;
+  const u2=D.querySelector("#stclosed .unf2"); if(u2) u2.onclick=()=>{ ACT={}; try{localStorage.setItem("bm_filt","{}");}catch(e){} renderStats(); toast("Đã bỏ lọc — hiện lại toàn bộ lệnh"); };
 }
 
 // ---------- heatmap drawing (incremental) ----------
