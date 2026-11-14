@@ -40,8 +40,11 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 #evl .ic{flex:none;width:14px;text-align:center}
 #evl .empty{color:var(--mut);cursor:default}
 #ev.min #evl{display:none}
-#st2{position:absolute;inset:0;width:auto;max-height:none;border-radius:0;border:0;background:var(--bg);border:1px solid var(--line);border-radius:10px;z-index:6;display:flex;flex-direction:column;font-size:12px}
-#st2 header{all:unset;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
+#st2{position:absolute;right:12px;bottom:12px;width:min(620px,calc(100% - 16px));height:min(360px,calc(100% - 16px));min-width:300px;min-height:150px;max-width:calc(100% - 8px);max-height:calc(100% - 8px);resize:both;overflow:hidden;background:rgba(14,20,31,.96);border:1px solid var(--line);border-radius:10px;z-index:6;display:flex;flex-direction:column;font-size:12px;box-shadow:0 8px 30px rgba(0,0,0,.45)}
+#st2 header{all:unset;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line)}
+#st2 .grip{cursor:move;user-select:none;touch-action:none;color:var(--mut);font-size:15px;padding:2px 4px;display:flex;align-items:center;gap:6px;flex:1;min-width:120px}
+#st2 .grip h2{font-size:13px;margin:0}
+#toast{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);background:#1d2736;border:1px solid var(--line);color:var(--fg);padding:7px 12px;border-radius:8px;font-size:12px;z-index:9;pointer-events:none}
 #st2 h2{margin:0;font-size:14px;flex:1;min-width:140px}
 #st2 .body{overflow:auto;padding:10px 12px;display:flex;flex-direction:column;gap:12px;min-height:0}
 #st2 table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
@@ -83,11 +86,12 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 <div id="wrap">
   <canvas id="heat"></canvas>
   <canvas id="ov"></canvas>
+  <div id="toast" hidden></div>
   <div id="st2" hidden>
-    <header><h2>Thống kê lệnh giấy tự động</h2><button id="stpop" title="Mở ra cửa sổ riêng">⧉ Cửa sổ riêng</button>
+    <header><div class="grip" id="stgrip" title="Kéo để di chuyển">⠿ <h2>Thống kê lệnh giấy</h2></div><button id="stpop" title="Mở ra cửa sổ riêng">⧉</button>
       <label>Xem <select id="stsym"><option value="cur">Mã đang xem</option><option value="all">Tất cả mã</option></select></label>
       <label>Phí + trượt <select id="fee"><option value="0.0003">0,03%</option><option value="0.0005" selected>0,05%</option><option value="0.0008">0,08%</option><option value="0.0012">0,12%</option></select></label>
-      <button id="csv">Xuất CSV</button><button id="clr">Xóa dữ liệu</button><button id="stx">📈 Về biểu đồ</button></header>
+      <button id="csv">Xuất CSV</button><button id="clr">Xóa dữ liệu</button><button id="stx" title="Ẩn bảng">✕</button></header>
     <div class="body">
       <div class="tw"><table id="sttab"></table></div>
       <details class="note"><summary>Cách tool tạo và chấm lệnh giấy</summary>Mỗi sự kiện đủ điều kiện tự tạo một <b>lệnh giấy</b> (không đặt lệnh thật): vào ở giá hiện tại, SL sau mức giá của sự kiện, TP = 2R (setup D: 1,5R), tối đa 30 phút rồi đóng theo giá. R đã trừ phí + trượt khứ hồi đã chọn. Dữ liệu lưu trong trình duyệt này, kể cả khi tắt trang.<br>
@@ -308,8 +312,8 @@ function openStatsWindow(){
   const css=document.querySelector("style").textContent;
   w.document.open(); w.document.write(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Thống kê lệnh giấy · Bookmap</title><style>${css}
     html,body{height:100%} body{display:block;padding:0}
-    #st2{position:static!important;width:auto!important;max-height:none!important;height:100vh;border:0;border-radius:0}
-    #st2 header{cursor:default} #stpop{display:none}</style></head><body></body></html>`); w.document.close();
+    #st2{position:static!important;width:auto!important;max-width:none!important;max-height:none!important;height:100vh!important;border:0;border-radius:0}
+    #st2{resize:none!important;box-shadow:none} .grip{cursor:default!important} #stpop{display:none}</style></head><body></body></html>`); w.document.close();
   w.document.body.appendChild(w.document.adoptNode(panel)); panel.hidden=false; panel.style.left=panel.style.top=""; S.statWin=w;
   w.addEventListener("beforeunload",()=>{ try{ const p=w.document.getElementById("st2"); if(p){ document.getElementById("wrap").appendChild(document.adoptNode(p)); p.hidden=true; } }catch(e){} S.statWin=null; $("statbtn").textContent="📊 Thống kê"; });
   renderStats(); return true;
@@ -591,18 +595,30 @@ $("follow").onclick=e=>{S.follow=!S.follow; e.target.classList.toggle("on",S.fol
 $("pause").onclick=e=>{S.paused=!S.paused; e.target.textContent=S.paused?"Tiếp tục":"Tạm dừng"; e.target.classList.toggle("on",S.paused);};
 $("hx").onclick=()=>{$("help").hidden=true;};
 $("autobtn").onclick=e=>{S.auto=!S.auto; e.target.classList.toggle("on",S.auto); e.target.textContent="🤖 Lệnh giấy: "+(S.auto?"Bật":"Tắt");};
-$("statbtn").onclick=()=>{ if(S.statWin&&!S.statWin.closed){ S.statWin.focus(); return; } const p=document.getElementById("st2"); p.hidden=!p.hidden; $("statbtn").textContent=p.hidden?"📊 Thống kê":"📈 Biểu đồ"; renderStats(); };
-$("stpop").onclick=()=>{ if(!openStatsWindow()) $("stpop").textContent="Trình duyệt chặn cửa sổ bật lên"; };
+function toast(t){ const el=$("toast"); el.textContent=t; el.hidden=false; clearTimeout(toast.h); toast.h=setTimeout(()=>{el.hidden=true;},2500); }
+$("statbtn").onclick=()=>{ if(S.statWin&&!S.statWin.closed){ S.statWin.focus(); return; } const p=document.getElementById("st2"); p.hidden=!p.hidden; $("statbtn").classList.toggle("on",!p.hidden); renderStats(); };
+// kéo bảng thống kê bằng thanh tiêu đề (biểu tượng ⠿)
+(()=>{ const p=$("st2"), g=$("stgrip"); let d=null;
+  try{ const pos=JSON.parse(localStorage.getItem("bm_stpos")||"null"); if(pos){ p.style.left=pos.l+"px"; p.style.top=pos.t+"px"; p.style.right="auto"; p.style.bottom="auto"; if(pos.w){p.style.width=pos.w+"px";p.style.height=pos.h+"px";} } }catch(e){}
+  g.addEventListener("pointerdown",e=>{ if(S.statWin) return; const r=p.getBoundingClientRect(), wr=$("wrap").getBoundingClientRect(); d={dx:e.clientX-r.left,dy:e.clientY-r.top,wr}; g.setPointerCapture(e.pointerId); e.preventDefault(); });
+  g.addEventListener("pointermove",e=>{ if(!d) return; const r=p.getBoundingClientRect();
+    p.style.right="auto"; p.style.bottom="auto";
+    p.style.left=Math.max(0,Math.min(d.wr.width-r.width,e.clientX-d.wr.left-d.dx))+"px";
+    p.style.top=Math.max(0,Math.min(d.wr.height-40,e.clientY-d.wr.top-d.dy))+"px"; });
+  const save=()=>{ try{ const r=p.getBoundingClientRect(), wr=$("wrap").getBoundingClientRect(); localStorage.setItem("bm_stpos",JSON.stringify({l:r.left-wr.left,t:r.top-wr.top,w:r.width,h:r.height})); }catch(e){} };
+  g.addEventListener("pointerup",()=>{ if(d){d=null;save();} }); g.addEventListener("pointercancel",()=>{d=null;});
+  new ResizeObserver(()=>{ if(!p.hidden&&!S.statWin&&p.style.left) save(); }).observe(p); })();
+$("stpop").onclick=()=>{ if(!openStatsWindow()) toast("Trình duyệt đang chặn cửa sổ bật lên. Cho phép ở thanh địa chỉ rồi bấm lại."); };
 
-$("stx").onclick=()=>{ if(S.statWin&&!S.statWin.closed){ S.statWin.close(); return; } document.getElementById("st2").hidden=true; $("statbtn").textContent="📊 Thống kê"; };
-$("stsym").onchange=()=>renderStats();
-$("fee").onchange=e=>{S.fee=+e.target.value;};
-$("clr").onclick=e=>{ if(e.target.dataset.c!=="1"){ e.target.dataset.c="1"; e.target.textContent="Bấm lần nữa để xóa"; setTimeout(()=>{e.target.dataset.c="";e.target.textContent="Xóa dữ liệu";},4000); return; }
-  S.sigClosed=[]; S.sigOpen=[]; saveSigs(); e.target.dataset.c=""; e.target.textContent="Xóa dữ liệu"; renderStats(); };
-$("csv").onclick=()=>{ const head=["gio_vao","gio_ra","ma","setup","huong","vao","sl","tp","thoat","cach_dong","R","ly_do"];
+$("stx").onclick=()=>{ if(S.statWin&&!S.statWin.closed){ S.statWin.close(); return; } document.getElementById("st2").hidden=true; $("statbtn").classList.remove("on"); };
+$("stsym").onchange=()=>{ renderStats(); toast(document.getElementById("stsym").value==="all"?"Đang xem tất cả các mã":"Đang xem mã hiện tại"); };
+$("fee").onchange=e=>{S.fee=+e.target.value; toast("Phí mới áp dụng cho các lệnh giấy mở từ bây giờ");};
+$("clr").onclick=e=>{ const btn=e.currentTarget; if(btn.dataset.c!=="1"){ btn.dataset.c="1"; btn.textContent="Bấm lần nữa để xóa"; toast("Bấm \"Bấm lần nữa để xóa\" trong 4 giây để xóa hết lệnh giấy"); setTimeout(()=>{btn.dataset.c="";btn.textContent="Xóa dữ liệu";},4000); return; }
+  const n=S.sigClosed.length; S.sigClosed=[]; S.sigOpen=[]; saveSigs(); btn.dataset.c=""; btn.textContent="Xóa dữ liệu"; renderStats(); toast(`Đã xóa ${n} lệnh giấy`); };
+$("csv").onclick=()=>{ if(!S.sigClosed.length){ toast("Chưa có lệnh giấy nào đã đóng để xuất"); return; } const head=["gio_vao","gio_ra","ma","setup","huong","vao","sl","tp","thoat","cach_dong","R","ly_do"];
   const rows=S.sigClosed.map(o=>[new Date(o.t).toISOString(),new Date(o.tx).toISOString(),o.sym,SETUP[o.setup],o.dir>0?"Mua":"Ban",o.entry,o.sl,o.tp,o.exit,o.how,o.R,o.why]);
   const csv=[head,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
-  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv"})); a.download="lenh_giay_bookmap.csv"; document.body.appendChild(a); a.click(); a.remove(); };
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv"})); a.download="lenh_giay_bookmap.csv"; document.body.appendChild(a); a.click(); a.remove(); toast(`Đã tải lenh_giay_bookmap.csv (${S.sigClosed.length} lệnh)`); };
 $("hb").onclick=()=>{$("help").hidden=!$("help").hidden;};
 $("evmin").onclick=e=>{const m=$("ev").classList.toggle("min"); e.target.textContent=m?"Mở":"Thu gọn";};
 $("wallmin").onchange=e=>{S.wallMin=+e.target.value; S.walls.clear();};
