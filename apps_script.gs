@@ -4,6 +4,11 @@
  * → Triển khai → Triển khai mới → Loại: Ứng dụng web → Thực thi dưới dạng: Tôi → Ai có quyền truy cập: Bất kỳ ai
  * → Triển khai → cấp quyền → chép "URL ứng dụng web" (…/exec) dán vào Bookmap: ⚙ → Đồng bộ Google Sheet.
  * Không cần mật khẩu hay API key. Ai có URL này đều ghi/đọc được sheet, nên đừng chia sẻ URL.
+ *
+ * Báo Telegram (tuỳ chọn): Apps Script → ⚙ Cài đặt dự án → Thuộc tính tập lệnh → thêm
+ *   TG_TOKEN = token bot (từ @BotFather)   TG_CHAT = chat id của bạn
+ * Token chỉ nằm trong Google của bạn, trang Bookmap không bao giờ thấy token.
+ * Sau khi thêm, chạy hàm thuTelegram() một lần (nút ▶ Chạy) để cấp quyền và thử gửi.
  */
 const SHEET_NAME = 'lenh_giay';
 const HEAD = ['id', 'json', 'gio_vao', 'ma', 'setup', 'huong', 'vao', 'thoat', 'cach_dong', 'R'];
@@ -23,11 +28,27 @@ function doGet() {
   return out_({ ok: true, trades });
 }
 
-// Trang Bookmap gửi POST các lệnh mới đóng; lệnh trùng id được bỏ qua
+function tg_(text) {
+  const p = PropertiesService.getScriptProperties(), tok = p.getProperty('TG_TOKEN'), chat = p.getProperty('TG_CHAT');
+  if (!tok || !chat) return 'chưa cài TG_TOKEN / TG_CHAT';
+  const r = UrlFetchApp.fetch('https://api.telegram.org/bot' + tok + '/sendMessage', { method: 'post', muteHttpExceptions: true,
+    payload: { chat_id: chat, text: String(text).slice(0, 3500), parse_mode: 'HTML', disable_web_page_preview: 'true' } });
+  return r.getResponseCode() === 200 ? 'ok' : 'Telegram lỗi ' + r.getResponseCode();
+}
+function thuTelegram() { Logger.log(tg_('✅ Bookmap mini: đã nối Telegram qua Google Sheet')); }
+
+// Trang Bookmap gửi POST: {trades:[…]} để lưu lệnh, {tg:{key,text}} để báo Telegram (trùng key thì bỏ qua)
 function doPost(e) {
+  const body0 = JSON.parse(e.postData.contents || '{}');
+  if (body0.tg) {
+    const c = CacheService.getScriptCache(), k = 'tg_' + String(body0.tg.key || '').slice(0, 200);
+    if (body0.tg.key && c.get(k)) return out_({ ok: true, tg: 'trùng, bỏ qua' });
+    const res = tg_(body0.tg.text || ''); if (body0.tg.key && res === 'ok') c.put(k, '1', 21600);
+    return out_({ ok: res === 'ok', tg: res });
+  }
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
-    const body = JSON.parse(e.postData.contents || '{}'), sh = sheet_(), n = sh.getLastRow() - 1;
+    const body = body0, sh = sheet_(), n = sh.getLastRow() - 1;
     const ids = new Set(n > 0 ? sh.getRange(2, 1, n, 1).getValues().map(r => String(r[0])) : []);
     const rows = [];
     for (const o of body.trades || []) {

@@ -176,6 +176,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
       <div class="sync" id="stsync">
         <div class="rh">Sao lưu lệnh giấy <span class="mut" id="synst"></span></div>
         <input id="syncurl" placeholder="Dán URL ứng dụng web Google Apps Script (…/exec)" spellcheck="false" autocomplete="off">
+        <label style="text-transform:none;letter-spacing:0;font-size:11.5px;color:var(--fg)"><input type="checkbox" data-r="tgA" checked> Báo Telegram mỗi lệnh <b>kèo A chuẩn</b> (vào + đóng) — cần cài TG_TOKEN, TG_CHAT trong Apps Script</label>
         <div class="row"><button id="syncsave">Lưu & đồng bộ</button><button id="syncnow">Đồng bộ ngay</button><button id="csvin">Nhập CSV</button><input type="file" id="csvfile" accept=".csv,text/csv" hidden></div>
         <details class="note"><summary>Cách tạo Google Sheet để lưu (làm 1 lần, ~3 phút)</summary>
           1. Tạo một Google Sheet mới → menu <b>Tiện ích mở rộng → Apps Script</b>.<br>
@@ -385,7 +386,7 @@ function mergeSigs(){
 }
 function saveSigs(){ try{ mergeSigs(); localStorage.setItem("bm_sigs",JSON.stringify(S.sigClosed)); localStorage.setItem("bm_sigopen",JSON.stringify(S.sigOpen.filter(o=>o.sym!=="DEMO"))); }catch(e){} }
 window.addEventListener("storage",e=>{ if(e.key==="bm_sigs"||e.key==="bm_sigopen"||e.key==="bm_clearT"){ mergeSigs(); renderStats(); }
-  if(e.key==="bm_rules"){ try{ Object.assign(RULE,JSON.parse(e.newValue||"{}")); document.querySelectorAll("#strules [data-r]").forEach(el=>{ const k=el.dataset.r; if(el.type==="checkbox") el.checked=!!RULE[k]; else el.value=String(RULE[k]); }); }catch(err){} }
+  if(e.key==="bm_rules"){ try{ Object.assign(RULE,JSON.parse(e.newValue||"{}")); document.querySelectorAll("#strules [data-r],#stsync [data-r]").forEach(el=>{ const k=el.dataset.r; if(el.type==="checkbox") el.checked=!!RULE[k]; else el.value=String(RULE[k]); }); }catch(err){} }
   if(e.key==="bm_filt"){ try{ ACT=JSON.parse(e.newValue||"{}")||{}; renderStats(); }catch(err){} } });
 // lệnh đang mở được theo dõi trực tiếp -> ghi lại mốc đã kiểm tra
 function touchSigs(){ const live=S.mkt!=="demo"&&S.synced&&!S.paused; if(live) for(const o of S.sigOpen) if(o.sym===S.sym&&(o.mkt||"fut")===S.mkt&&Date.now()-(o.chk||o.t)<30000) o.chk=Date.now(); saveSigs(); }
@@ -442,7 +443,7 @@ function features(dir){
     raw:{xh10_pct:+(dir*tr/m0*100).toFixed(3), cvd60_usd:Math.round(dir*cvd*m0), so_lech:+(dir*imb).toFixed(3), kl_x:+volX.toFixed(2), gio_utc:uh,
          spread_bps:+((last.ask-last.bid)/m0*1e4).toFixed(2), bien_dong5_pct:+(recentRange(300)/m0*100).toFixed(3)}};
 }
-const RULE_DEF={aH1:false,onA:true,onB:true,onC:true,onD:true,absMin:0,restMin:0,brkMin:0,brkAge:15,pullMin:0,pullAge:15,liqMinD:500000};
+const RULE_DEF={tgA:true,aH1:false,onA:true,onB:true,onC:true,onD:true,absMin:0,restMin:0,brkMin:0,brkAge:15,pullMin:0,pullAge:15,liqMinD:500000};
 let RULE={...RULE_DEF}; try{ Object.assign(RULE,JSON.parse(localStorage.getItem("bm_rules")||"{}")||{}); }catch(e){}
 // trả về lý do không vào lệnh, hoặc "" nếu đạt
 function ruleFail(setup,info){
@@ -474,7 +475,7 @@ function openSignal(setup,dir,ref,why,rr=2,info={}){
   const risk=Math.abs(px-sl); if(risk>px*0.012) return " · không vào lệnh: SL quá xa";           // SL quá xa thì bỏ
   const tp=px+dir*rr*risk;
   const o={id:Date.now()+Math.random(),t:Date.now(),chk:Date.now(),mkt:S.mkt,sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open",...(F0?{f:F0.b,raw:F0.raw}:{}),sz:info.sz||0,rest:info.rest,age:info.age};
-  S.sigOpen.push(o); saveSigs();
+  S.sigOpen.push(o); saveSigs(); try{ tgOpen(o); }catch(e){}
   addEvent("sig",px,`Lệnh giấy ${SETUP[setup]}: ${dir>0?"MUA":"BÁN"} @ ${fp(px)} · SL ${fp(sl)} · TP ${fp(tp)}`,true);
   renderStats();
   return "";
@@ -483,7 +484,7 @@ function closeSignal(o,exit,how){
   o.exit=exit; o.tx=Date.now(); o.how=how; o.status="closed";
   o.R=+((o.dir*(exit-o.entry)-o.fee*o.entry)/o.risk).toFixed(3);
   trackEx(o,o.dir*(exit-o.entry)/o.risk,o.tx);
-  S.sigOpen=S.sigOpen.filter(x=>x!==o); S.sigClosed.push(o); saveSigs(); archiveTrade(o);
+  S.sigOpen=S.sigOpen.filter(x=>x!==o); S.sigClosed.push(o); saveSigs(); archiveTrade(o); try{ tgClose(o); }catch(e){}
   if(o.sym===(S.mkt==="demo"?"DEMO":S.sym)) addEvent(o.R>0?"win":"loss",exit,`Lệnh giấy ${SETUP[o.setup]} ${o.dir>0?"MUA":"BÁN"} đóng ${how} @ ${fp(exit)} · ${o.R>0?"+":""}${o.R.toFixed(2)}R`,false);
   renderStats();
 }
@@ -935,7 +936,7 @@ document.addEventListener("visibilitychange",()=>{ if(document.hidden){ saveHist
 window.addEventListener("pagehide",()=>{ saveHist(); touchSigs(); });
 
 // ---------- sao lưu: Google Sheet (Apps Script) + nhập CSV ----------
-const GS_CODE="/**\n * L\u01b0u l\u1ec7nh gi\u1ea5y c\u1ee7a Bookmap mini v\u00e0o Google Sheet.\n * C\u00e1ch c\u00e0i: m\u1edf Google Sheet m\u1edbi \u2192 Ti\u1ec7n \u00edch m\u1edf r\u1ed9ng \u2192 Apps Script \u2192 xo\u00e1 h\u1ebft, d\u00e1n to\u00e0n b\u1ed9 file n\u00e0y \u2192 L\u01b0u\n * \u2192 Tri\u1ec3n khai \u2192 Tri\u1ec3n khai m\u1edbi \u2192 Lo\u1ea1i: \u1ee8ng d\u1ee5ng web \u2192 Th\u1ef1c thi d\u01b0\u1edbi d\u1ea1ng: T\u00f4i \u2192 Ai c\u00f3 quy\u1ec1n truy c\u1eadp: B\u1ea5t k\u1ef3 ai\n * \u2192 Tri\u1ec3n khai \u2192 c\u1ea5p quy\u1ec1n \u2192 ch\u00e9p \"URL \u1ee9ng d\u1ee5ng web\" (\u2026/exec) d\u00e1n v\u00e0o Bookmap: \u2699 \u2192 \u0110\u1ed3ng b\u1ed9 Google Sheet.\n * Kh\u00f4ng c\u1ea7n m\u1eadt kh\u1ea9u hay API key. Ai c\u00f3 URL n\u00e0y \u0111\u1ec1u ghi/\u0111\u1ecdc \u0111\u01b0\u1ee3c sheet, n\u00ean \u0111\u1eebng chia s\u1ebb URL.\n */\nconst SHEET_NAME = 'lenh_giay';\nconst HEAD = ['id', 'json', 'gio_vao', 'ma', 'setup', 'huong', 'vao', 'thoat', 'cach_dong', 'R'];\n\nfunction sheet_() {\n  const ss = SpreadsheetApp.getActiveSpreadsheet();\n  let sh = ss.getSheetByName(SHEET_NAME);\n  if (!sh) { sh = ss.insertSheet(SHEET_NAME); sh.appendRow(HEAD); sh.setFrozenRows(1); sh.hideColumns(2); }\n  return sh;\n}\nfunction out_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }\n\n// Trang Bookmap g\u1ecdi GET khi m\u1edf \u0111\u1ec3 l\u1ea5y l\u1ea1i to\u00e0n b\u1ed9 l\u1ec7nh c\u0169\nfunction doGet() {\n  const sh = sheet_(), n = sh.getLastRow() - 1, trades = [];\n  if (n > 0) for (const [js] of sh.getRange(2, 2, n, 1).getValues()) { try { trades.push(JSON.parse(js)); } catch (e) {} }\n  return out_({ ok: true, trades });\n}\n\n// Trang Bookmap g\u1eedi POST c\u00e1c l\u1ec7nh m\u1edbi \u0111\u00f3ng; l\u1ec7nh tr\u00f9ng id \u0111\u01b0\u1ee3c b\u1ecf qua\nfunction doPost(e) {\n  const lock = LockService.getScriptLock(); lock.waitLock(20000);\n  try {\n    const body = JSON.parse(e.postData.contents || '{}'), sh = sheet_(), n = sh.getLastRow() - 1;\n    const ids = new Set(n > 0 ? sh.getRange(2, 1, n, 1).getValues().map(r => String(r[0])) : []);\n    const rows = [];\n    for (const o of body.trades || []) {\n      if (!o || o.id == null) continue; const id = String(o.id); if (ids.has(id)) continue; ids.add(id);\n      rows.push([\"'\" + id, JSON.stringify(o), new Date(o.t), o.sym, o.setup, o.dir > 0 ? 'Mua' : 'Ban', o.entry, o.exit, o.how, o.R]);\n    }\n    if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, HEAD.length).setValues(rows);\n    return out_({ ok: true, added: rows.length, total: ids.size });\n  } finally { lock.releaseLock(); }\n}\n";
+const GS_CODE="/**\n * L\u01b0u l\u1ec7nh gi\u1ea5y c\u1ee7a Bookmap mini v\u00e0o Google Sheet.\n * C\u00e1ch c\u00e0i: m\u1edf Google Sheet m\u1edbi \u2192 Ti\u1ec7n \u00edch m\u1edf r\u1ed9ng \u2192 Apps Script \u2192 xo\u00e1 h\u1ebft, d\u00e1n to\u00e0n b\u1ed9 file n\u00e0y \u2192 L\u01b0u\n * \u2192 Tri\u1ec3n khai \u2192 Tri\u1ec3n khai m\u1edbi \u2192 Lo\u1ea1i: \u1ee8ng d\u1ee5ng web \u2192 Th\u1ef1c thi d\u01b0\u1edbi d\u1ea1ng: T\u00f4i \u2192 Ai c\u00f3 quy\u1ec1n truy c\u1eadp: B\u1ea5t k\u1ef3 ai\n * \u2192 Tri\u1ec3n khai \u2192 c\u1ea5p quy\u1ec1n \u2192 ch\u00e9p \"URL \u1ee9ng d\u1ee5ng web\" (\u2026/exec) d\u00e1n v\u00e0o Bookmap: \u2699 \u2192 \u0110\u1ed3ng b\u1ed9 Google Sheet.\n * Kh\u00f4ng c\u1ea7n m\u1eadt kh\u1ea9u hay API key. Ai c\u00f3 URL n\u00e0y \u0111\u1ec1u ghi/\u0111\u1ecdc \u0111\u01b0\u1ee3c sheet, n\u00ean \u0111\u1eebng chia s\u1ebb URL.\n *\n * B\u00e1o Telegram (tu\u1ef3 ch\u1ecdn): Apps Script \u2192 \u2699 C\u00e0i \u0111\u1eb7t d\u1ef1 \u00e1n \u2192 Thu\u1ed9c t\u00ednh t\u1eadp l\u1ec7nh \u2192 th\u00eam\n *   TG_TOKEN = token bot (t\u1eeb @BotFather)   TG_CHAT = chat id c\u1ee7a b\u1ea1n\n * Token ch\u1ec9 n\u1eb1m trong Google c\u1ee7a b\u1ea1n, trang Bookmap kh\u00f4ng bao gi\u1edd th\u1ea5y token.\n * Sau khi th\u00eam, ch\u1ea1y h\u00e0m thuTelegram() m\u1ed9t l\u1ea7n (n\u00fat \u25b6 Ch\u1ea1y) \u0111\u1ec3 c\u1ea5p quy\u1ec1n v\u00e0 th\u1eed g\u1eedi.\n */\nconst SHEET_NAME = 'lenh_giay';\nconst HEAD = ['id', 'json', 'gio_vao', 'ma', 'setup', 'huong', 'vao', 'thoat', 'cach_dong', 'R'];\n\nfunction sheet_() {\n  const ss = SpreadsheetApp.getActiveSpreadsheet();\n  let sh = ss.getSheetByName(SHEET_NAME);\n  if (!sh) { sh = ss.insertSheet(SHEET_NAME); sh.appendRow(HEAD); sh.setFrozenRows(1); sh.hideColumns(2); }\n  return sh;\n}\nfunction out_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }\n\n// Trang Bookmap g\u1ecdi GET khi m\u1edf \u0111\u1ec3 l\u1ea5y l\u1ea1i to\u00e0n b\u1ed9 l\u1ec7nh c\u0169\nfunction doGet() {\n  const sh = sheet_(), n = sh.getLastRow() - 1, trades = [];\n  if (n > 0) for (const [js] of sh.getRange(2, 2, n, 1).getValues()) { try { trades.push(JSON.parse(js)); } catch (e) {} }\n  return out_({ ok: true, trades });\n}\n\nfunction tg_(text) {\n  const p = PropertiesService.getScriptProperties(), tok = p.getProperty('TG_TOKEN'), chat = p.getProperty('TG_CHAT');\n  if (!tok || !chat) return 'ch\u01b0a c\u00e0i TG_TOKEN / TG_CHAT';\n  const r = UrlFetchApp.fetch('https://api.telegram.org/bot' + tok + '/sendMessage', { method: 'post', muteHttpExceptions: true,\n    payload: { chat_id: chat, text: String(text).slice(0, 3500), parse_mode: 'HTML', disable_web_page_preview: 'true' } });\n  return r.getResponseCode() === 200 ? 'ok' : 'Telegram l\u1ed7i ' + r.getResponseCode();\n}\nfunction thuTelegram() { Logger.log(tg_('\u2705 Bookmap mini: \u0111\u00e3 n\u1ed1i Telegram qua Google Sheet')); }\n\n// Trang Bookmap g\u1eedi POST: {trades:[\u2026]} \u0111\u1ec3 l\u01b0u l\u1ec7nh, {tg:{key,text}} \u0111\u1ec3 b\u00e1o Telegram (tr\u00f9ng key th\u00ec b\u1ecf qua)\nfunction doPost(e) {\n  const body0 = JSON.parse(e.postData.contents || '{}');\n  if (body0.tg) {\n    const c = CacheService.getScriptCache(), k = 'tg_' + String(body0.tg.key || '').slice(0, 200);\n    if (body0.tg.key && c.get(k)) return out_({ ok: true, tg: 'tr\u00f9ng, b\u1ecf qua' });\n    const res = tg_(body0.tg.text || ''); if (body0.tg.key && res === 'ok') c.put(k, '1', 21600);\n    return out_({ ok: res === 'ok', tg: res });\n  }\n  const lock = LockService.getScriptLock(); lock.waitLock(20000);\n  try {\n    const body = body0, sh = sheet_(), n = sh.getLastRow() - 1;\n    const ids = new Set(n > 0 ? sh.getRange(2, 1, n, 1).getValues().map(r => String(r[0])) : []);\n    const rows = [];\n    for (const o of body.trades || []) {\n      if (!o || o.id == null) continue; const id = String(o.id); if (ids.has(id)) continue; ids.add(id);\n      rows.push([\"'\" + id, JSON.stringify(o), new Date(o.t), o.sym, o.setup, o.dir > 0 ? 'Mua' : 'Ban', o.entry, o.exit, o.how, o.R]);\n    }\n    if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, HEAD.length).setValues(rows);\n    return out_({ ok: true, added: rows.length, total: ids.size });\n  } finally { lock.releaseLock(); }\n}\n";
 const SYNC={url:"",busy:false,lastErr:""};
 try{ const h=new URLSearchParams(location.hash.slice(1)).get("sync")||new URLSearchParams(location.search).get("sync");
   SYNC.url=h||localStorage.getItem("bm_sync")||""; if(h) localStorage.setItem("bm_sync",h); }catch(e){}
@@ -961,6 +962,15 @@ async function syncAll(manual){ if(!SYNC.url||SYNC.busy) return; SYNC.busy=true;
 // đẩy ngay khi đóng trang (sendBeacon vẫn gửi được lúc tab đóng)
 window.addEventListener("pagehide",()=>{ if(!SYNC.url) return; const sy=syncedIds(), todo=S.sigClosed.filter(o=>!sy.has(String(o.id))).slice(0,200);
   if(todo.length&&navigator.sendBeacon) try{ navigator.sendBeacon(SYNC.url,new Blob([JSON.stringify({trades:todo})],{type:"text/plain"})); }catch(e){} });
+// báo Telegram qua Apps Script (token nằm trong Google của bạn, không ở trang này)
+function tgNotify(key,text){ if(!SYNC.url||!RULE.tgA) return;
+  fetch(SYNC.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({tg:{key,text}}),redirect:"follow"})
+    .then(r=>r.json()).then(j=>{ if(!j.ok&&j.tg) synStatus("Telegram: "+j.tg,"neg"); }).catch(()=>{}); }
+const fpx=(v,ref)=>{ const d=ref>=1000?1:ref>=10?2:ref>=1?3:6; return (+v).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d}); };
+function tgOpen(o){ if(!isH1(o)) return; const c=o.sym.replace(/USDT$/,"");
+  tgNotify(o.id+":o",`🟦 <b>Kèo A chuẩn · ${o.dir>0?"MUA":"BÁN"} ${c}</b> (lệnh giấy)\nVào ${fpx(o.entry,o.entry)} · SL ${fpx(o.sl,o.entry)} · TP ${fpx(o.tp,o.entry)}\n${o.why}${o.sz?` ${(o.sz/1e6).toFixed(1)} tr USD`:""} · sổ nghiêng cùng chiều · ngược xu hướng\n⏱ tối đa 30 phút`); }
+function tgClose(o){ if(!isH1(o)) return; const c=o.sym.replace(/USDT$/,""), all=S.sigClosed.filter(isH1).filter(x=>x.t>=H1T), w=all.filter(x=>x.R>0).length, tot=all.reduce((a,x)=>a+x.R,0);
+  tgNotify(o.id+":c",`${o.R>0?"✅":"❌"} <b>Kèo A chuẩn · ${o.dir>0?"MUA":"BÁN"} ${c}</b> đóng ${o.how}\n${fpx(o.entry,o.entry)} → ${fpx(o.exit,o.entry)} · <b>${o.R>0?"+":""}${o.R.toFixed(2)}R</b>\nTừ lúc theo dõi: ${all.length} lệnh · thắng ${all.length?Math.round(w/all.length*100):0}% · ${tot>=0?"+":""}${tot.toFixed(1)}R`); }
 function parseCSV(t){ const rows=[]; let row=[], f="", q=false;
   for(let i=0;i<t.length;i++){ const c=t[i];
     if(q){ if(c==='"'){ if(t[i+1]==='"'){ f+='"'; i++; } else q=false; } else f+=c; }
@@ -1054,7 +1064,7 @@ $("csvfile").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; const
   toast(list.length?`Đã nhập ${n} lệnh mới từ ${f.name} (${list.length-n} lệnh đã có sẵn)`:"File không đúng định dạng CSV xuất từ Bookmap"); if(n&&SYNC.url) syncAll(false); };
 $("gscopy").onclick=async()=>{ try{ await navigator.clipboard.writeText(GS_CODE); toast("Đã sao chép mã Apps Script — dán vào trình soạn thảo Apps Script"); }
   catch(e){ const w=window.open("","_blank"); if(w){ w.document.body.innerText=GS_CODE; } else toast("Không sao chép được — mở file apps_script.gs trong repo GitHub"); } };
-document.querySelectorAll("#strules [data-r]").forEach(el=>{ const k=el.dataset.r;
+document.querySelectorAll("#strules [data-r],#stsync [data-r]").forEach(el=>{ const k=el.dataset.r;
   if(el.type==="checkbox") el.checked=!!RULE[k]; else el.value=String(RULE[k]);
   el.onchange=()=>{ RULE[k]=el.type==="checkbox"?el.checked:+el.value; try{localStorage.setItem("bm_rules",JSON.stringify(RULE));}catch(e){} toast("Đã lưu điều kiện vào lệnh — áp dụng cho lệnh mới"); }; });
 $("stcfg").onclick=()=>{ const D=SD(), c=D.getElementById("stcfgp"); c.hidden=!c.hidden; D.getElementById("stcfg").classList.toggle("on",!c.hidden); };
