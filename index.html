@@ -95,6 +95,12 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 #st2 .flt .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #st2 .flt .ft{grid-column:1/-1;color:var(--mut);font-size:11px;line-height:1.4;margin-top:4px}
 #st2 .fbadge{color:#f4b43a}
+#st2 .tri{width:24px;height:22px;padding:0;font-size:12px;color:var(--mut)} #st2 .tri.yes{color:var(--buy);border-color:var(--buy)} #st2 .tri.no{color:var(--sell);border-color:var(--sell)}
+#st2 .h1{border:1px solid rgba(79,195,247,.5);background:rgba(79,195,247,.07);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;font-size:12px}
+#st2 .h1t{display:flex;flex-direction:column} #st2 .h1t b{color:#4fc3f7}
+#st2 .h1g{display:grid;grid-template-columns:1fr 1fr;gap:8px} #st2 .h1g span{display:block;color:var(--mut);font-size:10.5px} #st2 .h1g b{font:700 13px var(--mono)}
+#st2 .h1p{height:5px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden} #st2 .h1p i{display:block;height:100%;background:#4fc3f7}
+#st2 .h1 .ft{grid-column:auto;margin:0} #st2 .h1 button{align-self:flex-start;font-size:11px;padding:3px 8px}
 #st2 .fbar{display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(244,180,58,.12);border:1px solid rgba(244,180,58,.5);color:#f4b43a;border-radius:8px;padding:6px 8px;font-size:12px}
 #st2 .fbar button{font-size:11px;padding:3px 8px}
 #st2 .chips{display:flex;gap:3px;flex-wrap:wrap;margin-left:6px} #st2 .chips span{font-size:9.5px;padding:0 4px;border-radius:3px;background:rgba(34,197,139,.14);color:var(--buy)}
@@ -154,6 +160,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
         <label><input type="checkbox" data-r="onA" checked><b>A · Bật tường</b></label>
         <span>Hấp thụ ≥ <select data-r="absMin"><option value="0">Tự động</option><option value="250000">250k</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="2000000">2 tr</option><option value="5000000">5 tr</option></select></span>
         <span>Tường đứng tại mức ≥ <select data-r="restMin"><option value="0">Không cần</option><option value="250000">250k</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="3000000">3 tr</option></select></span>
+        <label style="grid-column:1/-1"><input type="checkbox" data-r="aH1"> A chỉ vào khi đúng H1 (sổ nghiêng cùng chiều + ngược xu hướng) <span class="mut">— để tắt khi còn đang thu dữ liệu</span></label>
         <label><input type="checkbox" data-r="onB" checked><b>B · Phá tường</b></label>
         <span>Tường ≥ <select data-r="brkMin"><option value="0">Tự động</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="2000000">2 tr</option><option value="3000000">3 tr</option><option value="5000000">5 tr</option><option value="10000000">10 tr</option></select></span>
         <span>Đứng ≥ <select data-r="brkAge"><option value="15">15 s</option><option value="30">30 s</option><option value="60">60 s</option><option value="120">2 phút</option></select></span>
@@ -170,6 +177,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
       <div class="fbar" id="stfbar" hidden></div>
       <div class="kpi" id="stkpi"></div>
       <div class="setups" id="stsetup"></div>
+      <div class="h1" id="sth1"></div>
       <div class="sec"><span>Điều kiện lọc</span><select id="stfset" title="Xem theo setup"><option value="">Mọi setup</option><option>A</option><option>B</option><option>C</option><option>D</option></select></div>
       <div class="flt" id="stflt"></div>
       <div class="sec" id="stopenh"></div><div id="stopen"></div>
@@ -419,20 +427,29 @@ function features(dir){
     raw:{xh10_pct:+(dir*tr/m0*100).toFixed(3), cvd60_usd:Math.round(dir*cvd*m0), so_lech:+(dir*imb).toFixed(3), kl_x:+volX.toFixed(2), gio_utc:uh,
          spread_bps:+((last.ask-last.bid)/m0*1e4).toFixed(2), bien_dong5_pct:+(recentRange(300)/m0*100).toFixed(3)}};
 }
-const RULE_DEF={onA:true,onB:true,onC:true,onD:true,absMin:0,restMin:0,brkMin:0,brkAge:15,pullMin:0,pullAge:15,liqMinD:500000};
+const RULE_DEF={aH1:false,onA:true,onB:true,onC:true,onD:true,absMin:0,restMin:0,brkMin:0,brkAge:15,pullMin:0,pullAge:15,liqMinD:500000};
 let RULE={...RULE_DEF}; try{ Object.assign(RULE,JSON.parse(localStorage.getItem("bm_rules")||"{}")||{}); }catch(e){}
 // trả về lý do không vào lệnh, hoặc "" nếu đạt
 function ruleFail(setup,info){
   if(!RULE["on"+setup]) return "đang tắt setup "+setup;
+  if(setup==="A"&&RULE.aH1){ const f=info.f; if(!f||!f.book||f.trend) return "không đúng H1"; }
   if(setup==="A"){ if(RULE.absMin&&info.sz<RULE.absMin) return "hấp thụ nhỏ"; if(RULE.restMin&&(info.rest||0)<RULE.restMin) return "không có tường đứng"; }
   if(setup==="B"){ if(RULE.brkMin&&info.sz<RULE.brkMin) return "tường nhỏ"; if((info.age||0)<RULE.brkAge) return "tường mới đứng"; }
   if(setup==="C"){ if(RULE.pullMin&&info.sz<RULE.pullMin) return "tường nhỏ"; if((info.age||0)<RULE.pullAge) return "tường mới đứng"; }
   if(setup==="D"){ if(info.sz<RULE.liqMinD) return "cụm thanh lý nhỏ"; }
   return ""; }
 let ACT={}; try{ ACT=JSON.parse(localStorage.getItem("bm_filt")||"{}")||{}; }catch(e){}
-const passF=o=>{ const ks=Object.keys(ACT).filter(k=>ACT[k]); if(!ks.length) return true; return !!o.f&&ks.every(k=>o.f[k]); };
+// ACT[k]: true = phải ĐẠT, "no" = phải KHÔNG đạt (ví dụ ngược xu hướng); ACT._set / ACT._sym: chỉ setup / mã đó
+const passF=o=>{ const ks=FILT.map(f=>f[0]).filter(k=>ACT[k]);
+  if(ACT._set&&o.setup!==ACT._set) return false; if(ACT._sym&&!ACT._sym.split(",").includes(o.sym)) return false;
+  if(!ks.length) return true; return !!o.f&&ks.every(k=>ACT[k]==="no"?!o.f[k]:!!o.f[k]); };
+const nActive=()=>FILT.filter(f=>ACT[f[0]]).length+(ACT._set?1:0)+(ACT._sym?1:0);
+// Giả thuyết H1 (tìm ra từ dữ liệu 14/11): A + BTC/ETH + sổ nghiêng cùng chiều + ngược xu hướng 10 phút
+const isH1=o=>o.setup==="A"&&(o.sym==="BTCUSDT"||o.sym==="ETHUSDT")&&!!o.f&&o.f.book&&!o.f.trend;
+let H1T=0; try{ H1T=+(localStorage.getItem("bm_h1")||0); if(!H1T){ H1T=Date.now(); localStorage.setItem("bm_h1",String(H1T)); } }catch(e){ H1T=Date.now(); }
 function openSignal(setup,dir,ref,why,rr=2,info={}){
   if(!S.auto||S.bestBid==null||!S.bucket) return "";
+  const F0=features(dir); info.f=F0&&F0.b;
   const bad=ruleFail(setup,info); if(bad) return " · không vào lệnh: "+bad;
   const sym=S.mkt==="demo"?"DEMO":S.sym;
   if(S.sigOpen.some(o=>o.setup===setup&&o.sym===sym)) return " · không vào lệnh: setup đang có lệnh mở";
@@ -441,7 +458,7 @@ function openSignal(setup,dir,ref,why,rr=2,info={}){
   let sl=dir>0?Math.min(ref-2*B,px-minRisk):Math.max(ref+2*B,px+minRisk);
   const risk=Math.abs(px-sl); if(risk>px*0.012) return " · không vào lệnh: SL quá xa";           // SL quá xa thì bỏ
   const tp=px+dir*rr*risk;
-  const o={id:Date.now()+Math.random(),t:Date.now(),chk:Date.now(),mkt:S.mkt,sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open",...(F=>F?{f:F.b,raw:F.raw}:{})(features(dir)),sz:info.sz||0,rest:info.rest,age:info.age};
+  const o={id:Date.now()+Math.random(),t:Date.now(),chk:Date.now(),mkt:S.mkt,sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open",...(F0?{f:F0.b,raw:F0.raw}:{}),sz:info.sz||0,rest:info.rest,age:info.age};
   S.sigOpen.push(o); saveSigs();
   addEvent("sig",px,`Lệnh giấy ${SETUP[setup]}: ${dir>0?"MUA":"BÁN"} @ ${fp(px)} · SL ${fp(sl)} · TP ${fp(tp)}`,true);
   renderStats();
@@ -515,7 +532,7 @@ function renderStats(){
   const D=SD(), el=D.getElementById("st2"); if(!el||el.hidden) return;
   const all=D.getElementById("stsym").value==="all", sym=S.mkt==="demo"?"DEMO":S.sym;
   const base=S.sigClosed.filter(o=>all||o.sym===sym), rows=base.filter(passF), opens=S.sigOpen.filter(o=>all||o.sym===sym);
-  const nAct=Object.values(ACT).filter(Boolean).length;
+  const nAct=nActive();
   const sgn=(v,d=2)=>(v>0?"+":"")+v.toFixed(d), cls=v=>v>0?"pos":v<0?"neg":"";
   const st=xs=>{ const n=xs.length, w=xs.filter(o=>o.R>0).length, tot=xs.reduce((a,o)=>a+o.R,0); return {n,w,wr:n?w/n:null,tot,avg:n?tot/n:null}; };
   const A=st(rows), pls=opens.map(livePL).filter(Boolean), plR=pls.reduce((a,p)=>a+p.R,0);
@@ -523,7 +540,8 @@ function renderStats(){
   D.getElementById("stkpi").classList.toggle("on",!!nAct);
   const FB=D.getElementById("stfbar"); FB.hidden=!nAct;
   if(nAct){ const untag=base.filter(o=>!o.f).length;
-    FB.innerHTML=`<span>Đang lọc ${nAct} điều kiện: chỉ tính ${rows.length}/${base.length} lệnh${untag?` (${untag} lệnh cũ chưa ghi điều kiện nên bị loại)`:""}</span><button id="stunf">Bỏ lọc</button>`;
+    const desc=[ACT._set?"setup "+ACT._set:"",ACT._sym?ACT._sym.replace(/USDT/g,"").replace(/,/g,"/"):"",...FILT.filter(f=>ACT[f[0]]).map(f=>(ACT[f[0]]==="no"?"✗ ":"✓ ")+f[1])].filter(Boolean).join(", ");
+    FB.innerHTML=`<span title="${desc}">Đang lọc (${desc}): chỉ tính ${rows.length}/${base.length} lệnh${untag?` (${untag} lệnh cũ chưa ghi điều kiện nên bị loại)`:""}</span><button id="stunf">Bỏ lọc</button>`;
     D.getElementById("stunf").onclick=()=>{ ACT={}; try{localStorage.setItem("bm_filt","{}");}catch(e){} renderStats(); toast("Đã bỏ lọc — hiện lại toàn bộ lệnh"); }; }
   D.getElementById("stkpi").innerHTML=
     kp("Tổng R",A.n?sgn(A.tot,1):"–",cls(A.tot))+kp("Thắng",A.wr==null?"–":Math.round(A.wr*100)+"%")+kp("Số lệnh",A.n)+
@@ -537,8 +555,9 @@ function renderStats(){
   const fs=D.getElementById("stfset").value, fx=base.filter(o=>o.f&&(!fs||o.setup===fs));
   const cell=xs=>{ const a=st(xs); return a.n?`${a.n} · ${Math.round(a.wr*100)}% · <span class="${cls(a.avg)}">${sgn(a.avg)}</span>`:'<span class="mut">–</span>'; };
   let fh='<div class="h">Lọc</div><div class="h">Điều kiện</div><div class="h r">Đạt: lệnh·thắng·R</div><div class="h r">Không đạt</div>';
-  for(const [k,name,,tip] of FILT) fh+=`<label title="${tip}"><input type="checkbox" data-k="${k}" ${ACT[k]?"checked":""}><span class="nm">${name}</span><span class="r">${cell(fx.filter(o=>o.f[k]))}</span><span class="r">${cell(fx.filter(o=>!o.f[k]))}</span></label>`;
-  fh+=`<div class="ft">${fx.length} lệnh có ghi điều kiện. Điều kiện nào mà cột <b>Đạt</b> có R/lệnh cao hơn rõ rệt cột <b>Không đạt</b> (mỗi bên ≥ 30 lệnh) thì mới nên dùng. Tick ô <b>Lọc</b> để các ô số liệu và danh sách chỉ tính lệnh đạt điều kiện${nAct?` — <span class="fbadge">đang lọc ${nAct} điều kiện: ${rows.length}/${base.length} lệnh</span>`:""}.</div>`;
+  for(const [k,name,,tip] of FILT){ const v=ACT[k], lab=v==="no"?"✗":v?"✓":"–";
+    fh+=`<button class="tri ${v==="no"?"no":v?"yes":""}" data-k="${k}" title="Bấm để đổi: – không lọc → ✓ chỉ lệnh ĐẠT → ✗ chỉ lệnh KHÔNG đạt">${lab}</button><span class="nm" title="${tip}">${name}</span><span class="r">${cell(fx.filter(o=>o.f[k]))}</span><span class="r">${cell(fx.filter(o=>!o.f[k]))}</span>`; }
+  fh+=`<div class="ft">${fx.length} lệnh có ghi điều kiện. Điều kiện nào mà cột <b>Đạt</b> có R/lệnh cao hơn rõ rệt cột <b>Không đạt</b> (mỗi bên ≥ 30 lệnh) thì mới nên dùng. Bấm ô <b>Lọc</b> để đổi: <b>✓</b> chỉ tính lệnh đạt, <b>✗</b> chỉ tính lệnh không đạt (ví dụ ✗ Thuận xu hướng = chỉ lệnh ngược xu hướng)${nAct?` — <span class="fbadge">đang lọc ${nAct} điều kiện: ${rows.length}/${base.length} lệnh</span>`:""}.</div>`;
   // theo độ lớn (USD) của tường / hấp thụ / cụm thanh lý lúc vào lệnh
   const BK=[[0,5e5,"< 500k"],[5e5,1e6,"500k – 1 tr"],[1e6,3e6,"1 – 3 tr"],[3e6,1e7,"3 – 10 tr"],[1e7,1e15,"≥ 10 tr"]];
   const zx=base.filter(o=>o.sz&&(!fs||o.setup===fs));
@@ -547,7 +566,19 @@ function renderStats(){
   zh+=`</div>`;
   fh+=`<div class="ft" style="margin-top:8px;color:var(--fg)">Theo độ lớn lúc vào lệnh${fs?"":" (chọn từng setup ở ô trên để xem riêng)"}</div>`;
   const FL=D.getElementById("stflt"); FL.innerHTML=fh+zh;
-  FL.querySelectorAll("input").forEach(cb=>cb.onchange=()=>{ ACT[cb.dataset.k]=cb.checked; try{localStorage.setItem("bm_filt",JSON.stringify(ACT));}catch(e){} renderStats(); });
+  FL.querySelectorAll("button.tri").forEach(b=>b.onclick=()=>{ const k=b.dataset.k, v=ACT[k]; ACT[k]=v===true?"no":v==="no"?false:true; if(!ACT[k]) delete ACT[k];
+    try{localStorage.setItem("bm_filt",JSON.stringify(ACT));}catch(e){} renderStats(); });
+  // ---- theo dõi giả thuyết H1: chỉ chấm trên lệnh MỚI sau mốc bắt đầu ----
+  const all2=S.sigClosed.filter(isH1), aft=all2.filter(o=>o.t>=H1T), bef=all2.filter(o=>o.t<H1T), A1=st(aft), B1=st(bef);
+  const need=40, ok=A1.n>=30&&A1.wr>=0.55&&A1.avg>=0.3, bad=A1.n>=30&&!ok;
+  const H=D.getElementById("sth1");
+  H.innerHTML=`<div class="h1t"><b>Giả thuyết H1</b><span class="mut">A · BTC/ETH · sổ nghiêng cùng chiều · ngược xu hướng</span></div>
+    <div class="h1g"><div><span>Dữ liệu mới (từ ${new Date(H1T).toLocaleString("vi-VN",{hour12:false,day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})})</span><b class="${A1.n?cls(A1.avg):""}">${A1.n?`${A1.n} lệnh · ${Math.round(A1.wr*100)}% · ${sgn(A1.avg)}R`:"chưa có lệnh"}</b></div>
+    <div><span>Trước mốc (dùng để tìm ra H1)</span><b class="mut">${B1.n?`${B1.n} lệnh · ${Math.round(B1.wr*100)}% · ${sgn(B1.avg)}R`:"–"}</b></div></div>
+    <div class="h1p"><i style="width:${Math.min(100,A1.n/need*100)}%"></i></div>
+    <div class="ft">${ok?'<span class="pos">✔ Đạt: ≥ 30 lệnh mới, thắng ≥ 55%, ≥ +0,3R/lệnh → đủ cơ sở thử bot testnet.</span>':bad?'<span class="neg">✘ Không đạt trên dữ liệu mới → H1 có thể chỉ là ngẫu nhiên.</span>':`Cần ~${need} lệnh mới (đang ${A1.n}). Đạt khi thắng ≥ 55% và ≥ +0,3R/lệnh (nên đặt phí 0,08%).`}</div>
+    <button id="h1view">Xem lệnh H1</button>`;
+  D.getElementById("h1view").onclick=()=>{ ACT={_set:"A",_sym:"BTCUSDT,ETHUSDT",book:true,trend:"no"}; try{localStorage.setItem("bm_filt",JSON.stringify(ACT));}catch(e){} D.getElementById("stsym").value="all"; renderStats(); toast("Đang lọc theo H1 — bấm Bỏ lọc để xem lại tất cả"); };
   // lệnh đang mở
   D.getElementById("stopenh").innerHTML=`<span>Đang mở (${opens.length})</span>${opens.length?`<span class="${cls(plR)}">${sgn(plR)}R</span>`:""}`;
   let oh="";
