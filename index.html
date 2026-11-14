@@ -336,7 +336,20 @@ function onLiq(price,qty,sideSell,t){
 const SETUP={A:"A · Bật tường",B:"B · Phá tường",C:"C · Rút tường",D:"D · Sau thanh lý"};
 function loadSigs(){ try{ const j=JSON.parse(localStorage.getItem("bm_sigs")||"[]"); if(Array.isArray(j)) S.sigClosed=j; }catch(e){}
   try{ const j=JSON.parse(localStorage.getItem("bm_sigopen")||"[]"); if(Array.isArray(j)) S.sigOpen=j.filter(o=>o.sym!=="DEMO"); }catch(e){} }
-function saveSigs(){ try{ localStorage.setItem("bm_sigs",JSON.stringify(S.sigClosed.slice(-3000))); localStorage.setItem("bm_sigopen",JSON.stringify(S.sigOpen.filter(o=>o.sym!=="DEMO"))); }catch(e){} }
+// Nhiều tab cùng ghi lệnh giấy: trước khi lưu luôn gộp với dữ liệu tab khác đã lưu (theo id), không ghi đè mất lệnh
+function readLS(k){ try{ const j=JSON.parse(localStorage.getItem(k)||"[]"); return Array.isArray(j)?j:[]; }catch(e){ return []; } }
+function mergeSigs(){
+  let ct=0; try{ ct=+(localStorage.getItem("bm_clearT")||0); }catch(e){}
+  const closed=new Map();
+  for(const o of [...readLS("bm_sigs"),...S.sigClosed]) if((o.t||0)>=ct&&!closed.has(o.id)) closed.set(o.id,o);
+  const mem=new Map(S.sigOpen.map(o=>[o.id,o])), open=[];
+  for(const o of S.sigOpen) if(!closed.has(o.id)&&((o.t||0)>=ct||o.sym==="DEMO")) open.push(o);
+  for(const o of readLS("bm_sigopen")){ if(closed.has(o.id)||(o.t||0)<ct) continue;
+    const m=mem.get(o.id); if(m){ if((o.chk||0)>(m.chk||0)){ m.chk=o.chk; if(o.mark!=null) m.mark=o.mark; } } else open.push(o); }
+  S.sigClosed=[...closed.values()].sort((a,b)=>(a.tx||a.t)-(b.tx||b.t)).slice(-3000); S.sigOpen=open;
+}
+function saveSigs(){ try{ mergeSigs(); localStorage.setItem("bm_sigs",JSON.stringify(S.sigClosed)); localStorage.setItem("bm_sigopen",JSON.stringify(S.sigOpen.filter(o=>o.sym!=="DEMO"))); }catch(e){} }
+window.addEventListener("storage",e=>{ if(e.key==="bm_sigs"||e.key==="bm_sigopen"||e.key==="bm_clearT"){ mergeSigs(); renderStats(); } });
 // lệnh đang mở được theo dõi trực tiếp -> ghi lại mốc đã kiểm tra
 function touchSigs(){ const live=S.mkt!=="demo"&&S.synced&&!S.paused; if(live) for(const o of S.sigOpen) if(o.sym===S.sym&&(o.mkt||"fut")===S.mkt&&Date.now()-(o.chk||o.t)<30000) o.chk=Date.now(); saveSigs(); }
 async function fetchKlines(kind,sym,start,limit){
@@ -690,7 +703,13 @@ function frame(ts){
 }
 
 // ---------- column clock ----------
-function startClock(){ clearInterval(S.timer); S.timer=setInterval(()=>{ if(!S.paused) snapshotColumn(Date.now()); },S.speed); }
+// Đồng hồ chạy trong Web Worker: tab nằm nền vẫn chụp cột đều đặn (setInterval thường bị trình duyệt làm chậm còn 1 lần/phút)
+function startClock(){ clearInterval(S.timer); const tick=()=>{ const n=Date.now(); if(!S.paused) snapshotColumn(n);
+    if(n-(S.hk10||0)>=10000){ S.hk10=n; saveHist(); touchSigs(); }          // lưu lịch sử + đánh dấu lệnh đang theo dõi
+    if(n-(S.hk60||0)>=60000){ S.hk60=n; resolveOpen(false); } };            // chấm lệnh của mã khác bằng nến 1m
+  try{ if(!S.clockW){ S.clockW=new Worker(URL.createObjectURL(new Blob(["let t;onmessage=e=>{clearInterval(t);t=setInterval(()=>postMessage(0),e.data)}"],{type:"text/javascript"}))); S.clockW.onmessage=tick; }
+    S.clockW.postMessage(S.speed); }
+  catch(e){ S.clockW=null; S.timer=setInterval(tick,S.speed); } }
 
 // ---------- Binance connection ----------
 function EPS(kind){ const L=S.sym.toLowerCase(), U=S.sym;
@@ -829,8 +848,7 @@ async function backfill(kind,from,to,gen){
   if(S.center==null&&S.last!=null) S.center=S.last;
   return made*S.speed/60000;
 }
-setInterval(()=>{ saveHist(); touchSigs(); },10000);
-setInterval(()=>resolveOpen(false),60000);
+
 document.addEventListener("visibilitychange",()=>{ if(document.hidden){ saveHist(); touchSigs(); } });
 window.addEventListener("pagehide",()=>{ saveHist(); touchSigs(); });
 
@@ -907,7 +925,7 @@ $("stx").onclick=()=>{ if(S.statWin&&!S.statWin.closed){ S.statWin.close(); retu
 $("stsym").onchange=()=>{ renderStats(); toast(document.getElementById("stsym").value==="all"?"Đang xem tất cả các mã":"Đang xem mã hiện tại"); };
 $("fee").onchange=e=>{S.fee=+e.target.value; toast("Phí mới áp dụng cho các lệnh giấy mở từ bây giờ");};
 $("clr").onclick=e=>{ const btn=e.currentTarget; if(btn.dataset.c!=="1"){ btn.dataset.c="1"; btn.textContent="Bấm lần nữa để xóa"; toast("Bấm \"Bấm lần nữa để xóa\" trong 4 giây để xóa hết lệnh giấy"); setTimeout(()=>{btn.dataset.c="";btn.textContent="Xóa dữ liệu";},4000); return; }
-  const n=S.sigClosed.length; S.sigClosed=[]; S.sigOpen=[]; saveSigs(); btn.dataset.c=""; btn.textContent="Xóa dữ liệu"; renderStats(); toast(`Đã xóa ${n} lệnh giấy`); };
+  const n=S.sigClosed.length; try{ localStorage.setItem("bm_clearT",String(Date.now()+1)); localStorage.setItem("bm_sigs","[]"); localStorage.setItem("bm_sigopen","[]"); }catch(e){} S.sigClosed=[]; S.sigOpen=[]; saveSigs(); btn.dataset.c=""; btn.textContent="Xóa dữ liệu"; renderStats(); toast(`Đã xóa ${n} lệnh giấy`); };
 $("csv").onclick=()=>{ if(!S.sigClosed.length){ toast("Chưa có lệnh giấy nào đã đóng để xuất"); return; } const head=["gio_vao","gio_ra","ma","setup","huong","vao","sl","tp","thoat","cach_dong","R","ly_do","do_lon_usd","tuong_dung_usd","tuong_dung_giay",...FILT.map(f=>"dk_"+f[0])];
   const rows=S.sigClosed.map(o=>[new Date(o.t).toISOString(),new Date(o.tx).toISOString(),o.sym,SETUP[o.setup],o.dir>0?"Mua":"Ban",o.entry,o.sl,o.tp,o.exit,o.how,o.R,o.why,o.sz||"",o.rest??"",o.age??"",...FILT.map(f=>o.f?(o.f[f[0]]?1:0):"")]);
   const csv=[head,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
