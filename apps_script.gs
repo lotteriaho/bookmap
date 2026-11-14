@@ -16,7 +16,7 @@ const HEAD = ['id', 'json', 'gio_vao', 'gio_ra', 'giu_phut', 'ma', 'setup', 'huo
   'R', 'R_phi_0.08%', 'do_lon_usd', 'tuong_dung_usd', 'tuong_dung_giay', 'mfe_R', 'mae_R',
   'dk_thuan_xu_huong', 'dk_cvd_cung_chieu', 'dk_so_nghieng', 'dk_kl_tang', 'dk_phien_au_my', 'keo_A_chuan',
   'xh10_pct', 'cvd60_usd', 'so_lech', 'kl_x', 'bien_dong5_pct', 'spread_bps'];
-const SETUP_NAME = { A: 'A · Bật tường', B: 'B · Phá tường', C: 'C · Rút tường', D: 'D · Sau thanh lý', E: 'E · Bẫy phá tường', F: 'F · Bẫy rút tường' };
+const SETUP_NAME = { A: 'A · Bật tường', B: 'B · Phá tường', C: 'C · Rút tường', D: 'D · Sau thanh lý', E: 'E · Bẫy phá tường', F: 'F · Bẫy rút tường', G: 'G · Chạm tường dày' };
 
 // một lệnh (JSON từ trang Bookmap) -> một dòng đầy đủ cột để đọc / lọc / vẽ trên Sheet
 function row_(o) {
