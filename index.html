@@ -170,6 +170,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
         <label><input type="checkbox" data-r="onC" checked><b>C · Rút tường</b></label>
         <span>Tường ≥ <select data-r="pullMin"><option value="0">Tự động</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="2000000">2 tr</option><option value="3000000">3 tr</option><option value="5000000">5 tr</option><option value="10000000">10 tr</option></select></span>
         <span>Đứng ≥ <select data-r="pullAge"><option value="15">15 s</option><option value="30">30 s</option><option value="60">60 s</option><option value="120">2 phút</option></select></span>
+        <label><input type="checkbox" data-r="onE" checked><b>E · Bẫy phá tường</b></label><span class="mut" style="grid-column:2/-1">ngược B · dùng ngưỡng tường của B · SL ×2, TP 1,5R, 60 phút</span>
+        <label><input type="checkbox" data-r="onF" checked><b>F · Bẫy rút tường</b></label><span class="mut" style="grid-column:2/-1">ngược C · dùng ngưỡng tường của C · SL ×2, TP 1,5R, 60 phút</span>
         <label><input type="checkbox" data-r="onD" checked><b>D · Sau thanh lý</b></label>
         <span>Cụm thanh lý ≥ <select data-r="liqMinD"><option value="250000">250k</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="3000000">3 tr</option><option value="10000000">10 tr</option></select></span><span></span>
       </div>
@@ -193,8 +195,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
       <div class="fbar" id="stfbar" hidden></div>
       <div class="kpi" id="stkpi"></div>
       <div class="setups" id="stsetup"></div>
+      <div class="h1" id="sth2"></div>
       <div class="h1" id="sth1"></div>
-      <div class="sec"><span>Điều kiện lọc</span><select id="stfset" title="Xem theo setup"><option value="">Mọi setup</option><option>A</option><option>B</option><option>C</option><option>D</option></select></div>
+      <div class="sec"><span>Điều kiện lọc</span><select id="stfset" title="Xem theo setup"><option value="">Mọi setup</option><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option></select></div>
       <div class="flt" id="stflt"></div>
       <div class="sec" id="stopenh"></div><div id="stopen"></div>
       <div class="sec" id="stclh"></div><div id="stclosed"></div>
@@ -337,8 +340,10 @@ function detectWalls(col,agg,mid){
     if(cur<w.peak*0.35){
       if(w.ann){ const drop=w.peak-cur, traded=tradedSince(k,w.since);
         const info={sz:w.peak*p,age:Math.round(age)};
-        if(traded>=drop*0.5){ const r=openSignal("B",w.side==="bid"?-1:1,p,"phá tường",2,info); addEvent("brk",p,`Tường ${w.side==="bid"?"mua":"bán"} ${fmtQ(w.peak)} ${coin()} (${fusd(w.peak*p)}, đứng ${Math.round(age)} s) @ ${fp(p)} bị ăn hết (khớp ${fusd(traded*p)})${r}`,true); }
-        else if(dist<=20){ const r=openSignal("C",w.side==="bid"?-1:1,p,"rút tường",2,info); addEvent("pull",p,`Rút tường ${w.side==="bid"?"mua":"bán"} ${fmtQ(w.peak)} ${coin()} (${fusd(w.peak*p)}, đứng ${Math.round(age)} s) @ ${fp(p)} khi giá cách ${fp(dist*B)} (nghi lệnh giả)${r}`,true); } }
+        // E/F: đánh NGƯỢC B/C (tường bị phá / bị rút thường là bẫy) — SL = 2 lần SL của B/C, TP 1,5R, giữ tối đa 60 phút
+        const fade=(st,why)=>openSignal(st,w.side==="bid"?1:-1,p,why,1.5,{...info,fade:2,hold:3600000});
+        if(traded>=drop*0.5){ const r=openSignal("B",w.side==="bid"?-1:1,p,"phá tường",2,info)+fade("E","bẫy phá tường"); addEvent("brk",p,`Tường ${w.side==="bid"?"mua":"bán"} ${fmtQ(w.peak)} ${coin()} (${fusd(w.peak*p)}, đứng ${Math.round(age)} s) @ ${fp(p)} bị ăn hết (khớp ${fusd(traded*p)})${r}`,true); }
+        else if(dist<=20){ const r=openSignal("C",w.side==="bid"?-1:1,p,"rút tường",2,info)+fade("F","bẫy rút tường"); addEvent("pull",p,`Rút tường ${w.side==="bid"?"mua":"bán"} ${fmtQ(w.peak)} ${coin()} (${fusd(w.peak*p)}, đứng ${Math.round(age)} s) @ ${fp(p)} khi giá cách ${fp(dist*B)} (nghi lệnh giả)${r}`,true); } }
       S.walls.delete(k); }
     else if(now-w.seen>40) S.walls.delete(k);
   }
@@ -369,7 +374,7 @@ function onLiq(price,qty,sideSell,t){
 }
 
 // ---------- lệnh giấy tự động ----------
-const SETUP={A:"A · Bật tường",B:"B · Phá tường",C:"C · Rút tường",D:"D · Sau thanh lý"};
+const SETUP={A:"A · Bật tường",B:"B · Phá tường",C:"C · Rút tường",D:"D · Sau thanh lý",E:"E · Bẫy phá tường",F:"F · Bẫy rút tường"};
 function loadSigs(){ try{ const j=JSON.parse(localStorage.getItem("bm_sigs")||"[]"); if(Array.isArray(j)) S.sigClosed=j; }catch(e){}
   try{ const j=JSON.parse(localStorage.getItem("bm_sigopen")||"[]"); if(Array.isArray(j)) S.sigOpen=j.filter(o=>o.sym!=="DEMO"); }catch(e){} }
 // Nhiều tab cùng ghi lệnh giấy: trước khi lưu luôn gộp với dữ liệu tab khác đã lưu (theo id), không ghi đè mất lệnh
@@ -412,14 +417,14 @@ async function resolveOpen(all){
     const K=await fetchKlines(g.mkt,g.sym,g.from,Math.min(1000,Math.ceil((now-g.from)/60000)+2));
     if(!K||!K.length){ for(const o of g.list){ o.fails=(o.fails||0)+1; if(o.fails>=3) o.chk=Date.now(); } continue; }  // không lấy được nến 3 lần -> bỏ qua đoạn trống
     for(const o of g.list){ if(o.status!=="open"||!S.sigOpen.includes(o)) continue;
-      const from=Math.max(o.t,o.chk||o.t), exp=o.t+1800000; let closed=false;
+      const from=Math.max(o.t,o.chk||o.t), exp=o.t+(o.hold||1800000); let closed=false;
       for(const k of K){ const t0=+k[0]; if(t0+60000<=from) continue;
         const hi=+k[2], lo=+k[3], cl=+k[4], tk=Math.max(o.t,t0+30000);
         trackEx(o,o.dir>0?(hi-o.entry)/o.risk:(o.entry-lo)/o.risk,tk); trackEx(o,o.dir>0?(lo-o.entry)/o.risk:(o.entry-hi)/o.risk,tk);
         const sl=o.dir>0?lo<=o.sl:hi>=o.sl, tp=o.dir>0?hi>=o.tp:lo<=o.tp;
         if(sl){ closeSignal(o,o.sl,"chạm SL (nến 1m)"); closed=true; break; }   // cùng nến chạm cả 2 -> tính SL cho chắc
         if(tp){ closeSignal(o,o.tp,"chạm TP (nến 1m)"); closed=true; break; }
-        if(t0+60000>=exp&&exp<=now){ closeSignal(o,cl,"hết 30 phút (nến 1m)"); closed=true; break; }
+        if(t0+60000>=exp&&exp<=now){ closeSignal(o,cl,`hết ${Math.round((o.hold||1800000)/60000)} phút (nến 1m)`); closed=true; break; }
       }
       if(closed) done++; else { o.chk=Date.now(); o.fails=0; const L=K[K.length-1]; o.mark=+L[4]; } }
   }
@@ -443,7 +448,7 @@ function features(dir){
     raw:{xh10_pct:+(dir*tr/m0*100).toFixed(3), cvd60_usd:Math.round(dir*cvd*m0), so_lech:+(dir*imb).toFixed(3), kl_x:+volX.toFixed(2), gio_utc:uh,
          spread_bps:+((last.ask-last.bid)/m0*1e4).toFixed(2), bien_dong5_pct:+(recentRange(300)/m0*100).toFixed(3)}};
 }
-const RULE_DEF={tgA:true,aH1:false,onA:true,onB:true,onC:true,onD:true,absMin:0,restMin:0,brkMin:0,brkAge:15,pullMin:0,pullAge:15,liqMinD:500000};
+const RULE_DEF={tgA:true,aH1:false,onA:true,onB:true,onC:true,onD:true,onE:true,onF:true,absMin:0,restMin:0,brkMin:0,brkAge:15,pullMin:0,pullAge:15,liqMinD:500000};
 let RULE={...RULE_DEF}; try{ Object.assign(RULE,JSON.parse(localStorage.getItem("bm_rules")||"{}")||{}); }catch(e){}
 // trả về lý do không vào lệnh, hoặc "" nếu đạt
 function ruleFail(setup,info){
@@ -453,6 +458,8 @@ function ruleFail(setup,info){
   if(setup==="B"){ if(RULE.brkMin&&info.sz<RULE.brkMin) return "tường nhỏ"; if((info.age||0)<RULE.brkAge) return "tường mới đứng"; }
   if(setup==="C"){ if(RULE.pullMin&&info.sz<RULE.pullMin) return "tường nhỏ"; if((info.age||0)<RULE.pullAge) return "tường mới đứng"; }
   if(setup==="D"){ if(info.sz<RULE.liqMinD) return "cụm thanh lý nhỏ"; }
+  if(setup==="E"){ if(RULE.brkMin&&info.sz<RULE.brkMin) return "tường nhỏ"; if((info.age||0)<RULE.brkAge) return "tường mới đứng"; }
+  if(setup==="F"){ if(RULE.pullMin&&info.sz<RULE.pullMin) return "tường nhỏ"; if((info.age||0)<RULE.pullAge) return "tường mới đứng"; }
   return ""; }
 let ACT={}; try{ ACT=JSON.parse(localStorage.getItem("bm_filt")||"{}")||{}; }catch(e){}
 // ACT[k]: true = phải ĐẠT, "no" = phải KHÔNG đạt (ví dụ ngược xu hướng); ACT._set / ACT._sym: chỉ setup / mã đó
@@ -462,6 +469,10 @@ const passF=o=>{ const ks=FILT.map(f=>f[0]).filter(k=>ACT[k]);
 const nActive=()=>FILT.filter(f=>ACT[f[0]]).length+(ACT._set?1:0)+(ACT._sym?1:0);
 // Giả thuyết H1 (tìm ra từ dữ liệu 14/11): A + BTC/ETH + sổ nghiêng cùng chiều + ngược xu hướng 10 phút
 const isH1=o=>o.setup==="A"&&(o.sym==="BTCUSDT"||o.sym==="ETHUSDT")&&!!o.f&&o.f.book&&!o.f.trend;
+// Kèo 2 (tìm ra 14/11 tối bằng mô phỏng lại 110 lệnh trên giá 1 giây): đánh ngược B/C
+const isK2=o=>o.setup==="E"||o.setup==="F";
+const isWatch=o=>isH1(o)||isK2(o);
+let K2T=0; try{ K2T=+(localStorage.getItem("bm_k2")||0); if(!K2T){ K2T=Date.now(); localStorage.setItem("bm_k2",String(K2T)); } }catch(e){ K2T=Date.now(); }
 let H1T=0; try{ H1T=+(localStorage.getItem("bm_h1")||0); if(!H1T){ H1T=Date.now(); localStorage.setItem("bm_h1",String(H1T)); } }catch(e){ H1T=Date.now(); }
 function openSignal(setup,dir,ref,why,rr=2,info={}){
   if(!S.auto||S.bestBid==null||!S.bucket) return "";
@@ -472,9 +483,11 @@ function openSignal(setup,dir,ref,why,rr=2,info={}){
   const B=S.bucket, px=dir>0?S.bestAsk:S.bestBid;
   const minRisk=Math.max(4*B, 0.5*recentRange(60), px*S.fee*3);
   let sl=dir>0?Math.min(ref-2*B,px-minRisk):Math.max(ref+2*B,px+minRisk);
-  const risk=Math.abs(px-sl); if(risk>px*0.012) return " · không vào lệnh: SL quá xa";           // SL quá xa thì bỏ
+  if(info.fade){ const d0=-dir, sl0=d0>0?Math.min(ref-2*B,px-minRisk):Math.max(ref+2*B,px+minRisk);   // SL mà lệnh B/C gốc sẽ dùng
+    sl=px-dir*info.fade*Math.abs(px-sl0); }
+  const risk=Math.abs(px-sl); if(risk>px*(info.fade?0.024:0.012)) return " · không vào lệnh: SL quá xa";           // SL quá xa thì bỏ
   const tp=px+dir*rr*risk;
-  const o={id:Date.now()+Math.random(),t:Date.now(),chk:Date.now(),mkt:S.mkt,sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open",...(F0?{f:F0.b,raw:F0.raw}:{}),sz:info.sz||0,rest:info.rest,age:info.age};
+  const o={id:Date.now()+Math.random(),t:Date.now(),chk:Date.now(),mkt:S.mkt,sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open",...(F0?{f:F0.b,raw:F0.raw}:{}),sz:info.sz||0,rest:info.rest,age:info.age,...(info.hold?{hold:info.hold}:{})};
   S.sigOpen.push(o); saveSigs(); try{ tgOpen(o); }catch(e){}
   addEvent("sig",px,`Lệnh giấy ${SETUP[setup]}: ${dir>0?"MUA":"BÁN"} @ ${fp(px)} · SL ${fp(sl)} · TP ${fp(tp)}`,true);
   renderStats();
@@ -495,8 +508,8 @@ function checkSignals(bid,ask){
   for(const o of [...S.sigOpen]){ if(o.sym!==sym||(o.mkt||"fut")!==S.mkt&&sym!=="DEMO") continue;
     if(sym!=="DEMO"&&now-(o.chk||o.t)>30000) continue;   // đang chờ chấm bằng nến 1m cho đoạn bị đóng trang
     trackEx(o,o.dir*((o.dir>0?bid:ask)-o.entry)/o.risk,now);
-    if(o.dir>0){ if(bid<=o.sl) closeSignal(o,o.sl,"chạm SL"); else if(bid>=o.tp) closeSignal(o,o.tp,"chạm TP"); else if(now-o.t>1800000) closeSignal(o,bid,"hết 30 phút"); }
-    else { if(ask>=o.sl) closeSignal(o,o.sl,"chạm SL"); else if(ask<=o.tp) closeSignal(o,o.tp,"chạm TP"); else if(now-o.t>1800000) closeSignal(o,ask,"hết 30 phút"); } }
+    if(o.dir>0){ if(bid<=o.sl) closeSignal(o,o.sl,"chạm SL"); else if(bid>=o.tp) closeSignal(o,o.tp,"chạm TP"); else if(now-o.t>(o.hold||1800000)) closeSignal(o,bid,`hết ${Math.round((o.hold||1800000)/60000)} phút`); }
+    else { if(ask>=o.sl) closeSignal(o,o.sl,"chạm SL"); else if(ask<=o.tp) closeSignal(o,o.tp,"chạm TP"); else if(now-o.t>(o.hold||1800000)) closeSignal(o,ask,`hết ${Math.round((o.hold||1800000)/60000)} phút`); } }
 }
 function detectCascade(){
   const now=Date.now(); S.liqWin=S.liqWin.filter(x=>now-x.t<120000);
@@ -535,7 +548,7 @@ function livePL(o){
   if(cur&&S.bestBid!=null&&S.bestAsk!=null){ px=o.dir>0?S.bestBid:S.bestAsk; src="live"; } else if(o.mark!=null){ px=o.mark; src="1m"; }
   if(px==null) return null;
   const R=(o.dir*(px-o.entry)-o.fee*o.entry)/o.risk, pct=o.dir*(px-o.entry)/o.entry*100-o.fee*100;
-  const left=Math.max(0,o.t+1800000-Date.now());
+  const left=Math.max(0,o.t+(o.hold||1800000)-Date.now());
   return {px,R,pct,left,src};
 }
 function openCells(o,f){ const p=livePL(o);
@@ -563,7 +576,7 @@ function renderStats(){
     kp("Tổng R",A.n?sgn(A.tot,1):"–",cls(A.tot))+kp("Thắng",A.wr==null?"–":Math.round(A.wr*100)+"%")+kp("Số lệnh",A.n)+
     kp("R / lệnh",A.avg==null?"–":sgn(A.avg),cls(A.avg||0));
   let h='<div class="h">Setup</div><div class="h r">Lệnh</div><div class="h r">Thắng</div><div class="h r">Tổng R</div>';
-  for(const k of ["A","B","C","D"]){ const a=st(rows.filter(o=>o.setup===k)), op=opens.filter(o=>o.setup===k).length;
+  for(const k of ["A","B","C","D","E","F"]){ const a=st(rows.filter(o=>o.setup===k)), op=opens.filter(o=>o.setup===k).length;
     const tip=a.n?`TB/lệnh ${sgn(a.avg)}R`:"Chưa có lệnh";
     h+=`<div class="nm" title="${tip}"><i>${k}</i>${SETUP[k].split("· ")[1]}${op?` <span class="tag">${op} mở</span>`:""}</div><div class="r">${a.n||'<span class="mut">0</span>'}</div><div class="r">${a.wr==null?'<span class="mut">–</span>':Math.round(a.wr*100)+"%"}</div><div class="r ${cls(a.tot)}">${a.n?sgn(a.tot,1):'<span class="mut">–</span>'}</div>`; }
   D.getElementById("stsetup").innerHTML=h;
@@ -595,6 +608,15 @@ function renderStats(){
     <div class="ft">${ok?'<span class="pos">✔ Đạt: ≥ 30 lệnh mới, thắng ≥ 55%, ≥ +0,3R/lệnh → đủ cơ sở thử bot testnet.</span>':bad?'<span class="neg">✘ Không đạt trên dữ liệu mới → kèo này có thể chỉ là may rủi.</span>':`Cần ~${need} lệnh mới (đang ${A1.n}). Đạt khi thắng ≥ 55% và ≥ +0,3R/lệnh (nên đặt phí 0,08%).`}</div>
     <button id="h1view">Xem các lệnh kèo này</button>`;
   D.getElementById("h1view").onclick=()=>{ ACT={_set:"A",_sym:"BTCUSDT,ETHUSDT",book:true,trend:"no"}; try{localStorage.setItem("bm_filt",JSON.stringify(ACT));}catch(e){} D.getElementById("stsym").value="all"; renderStats(); toast("Đang lọc theo kèo A chuẩn — bấm Bỏ lọc để xem lại tất cả"); };
+  { const all3=S.sigClosed.filter(isK2), a3=st(all3.filter(o=>o.t>=K2T)), need2=40, ok2=a3.n>=30&&a3.wr>=0.5&&a3.avg>=0.15, bad2=a3.n>=30&&!ok2;
+    const opE=S.sigOpen.filter(isK2).length;
+    D.getElementById("sth2").innerHTML=`<div class="h1t"><b>Kèo thử nghiệm 2: Bẫy tường (E + F)</b><span class="mut">Tường bị phá / bị rút → đánh ngược · SL ×2 · TP 1,5R · tối đa 60 phút · mọi mã</span></div>
+      <div class="h1g"><div><span>Dữ liệu mới (từ ${new Date(K2T).toLocaleString("vi-VN",{hour12:false,day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})})</span><b class="${a3.n?cls(a3.avg):""}">${a3.n?`${a3.n} lệnh · ${Math.round(a3.wr*100)}% · ${sgn(a3.avg)}R`:"chưa có lệnh"}${opE?` <span class="tag">${opE} mở</span>`:""}</b></div>
+      <div><span>Mô phỏng lại 53 lệnh B/C cũ</span><b class="mut">57% · +0,21R (phí 0,08%)</b></div></div>
+      <div class="h1p"><i style="width:${Math.min(100,a3.n/need2*100)}%"></i></div>
+      <div class="ft">${ok2?'<span class="pos">✔ Đạt: ≥ 30 lệnh mới, thắng ≥ 50%, ≥ +0,15R/lệnh.</span>':bad2?'<span class="neg">✘ Không đạt trên dữ liệu mới.</span>':`Cần ~${need2} lệnh mới (đang ${a3.n}). Đạt khi thắng ≥ 50% và ≥ +0,15R/lệnh.`}</div>
+      <button id="h2view">Xem các lệnh kèo này</button>`;
+    D.getElementById("h2view").onclick=()=>{ ACT={}; D.getElementById("stfset").value=""; try{localStorage.setItem("bm_filt","{}");}catch(e){} D.getElementById("stsym").value="all"; renderStats(); toast("Bảng setup: xem dòng E và F"); }; }
   // lệnh đang mở
   D.getElementById("stopenh").innerHTML=`<span>Đang mở (${opens.length})</span>${opens.length?`<span class="${cls(plR)}">${sgn(plR)}R</span>`:""}`;
   let oh="";
@@ -936,7 +958,7 @@ document.addEventListener("visibilitychange",()=>{ if(document.hidden){ saveHist
 window.addEventListener("pagehide",()=>{ saveHist(); touchSigs(); });
 
 // ---------- sao lưu: Google Sheet (Apps Script) + nhập CSV ----------
-const GS_CODE="/**\n * L\u01b0u l\u1ec7nh gi\u1ea5y c\u1ee7a Bookmap mini v\u00e0o Google Sheet.\n * C\u00e1ch c\u00e0i: m\u1edf Google Sheet m\u1edbi \u2192 Ti\u1ec7n \u00edch m\u1edf r\u1ed9ng \u2192 Apps Script \u2192 xo\u00e1 h\u1ebft, d\u00e1n to\u00e0n b\u1ed9 file n\u00e0y \u2192 L\u01b0u\n * \u2192 Tri\u1ec3n khai \u2192 Tri\u1ec3n khai m\u1edbi \u2192 Lo\u1ea1i: \u1ee8ng d\u1ee5ng web \u2192 Th\u1ef1c thi d\u01b0\u1edbi d\u1ea1ng: T\u00f4i \u2192 Ai c\u00f3 quy\u1ec1n truy c\u1eadp: B\u1ea5t k\u1ef3 ai\n * \u2192 Tri\u1ec3n khai \u2192 c\u1ea5p quy\u1ec1n \u2192 ch\u00e9p \"URL \u1ee9ng d\u1ee5ng web\" (\u2026/exec) d\u00e1n v\u00e0o Bookmap: \u2699 \u2192 \u0110\u1ed3ng b\u1ed9 Google Sheet.\n * Kh\u00f4ng c\u1ea7n m\u1eadt kh\u1ea9u hay API key. Ai c\u00f3 URL n\u00e0y \u0111\u1ec1u ghi/\u0111\u1ecdc \u0111\u01b0\u1ee3c sheet, n\u00ean \u0111\u1eebng chia s\u1ebb URL.\n *\n * B\u00e1o Telegram (tu\u1ef3 ch\u1ecdn): Apps Script \u2192 \u2699 C\u00e0i \u0111\u1eb7t d\u1ef1 \u00e1n \u2192 Thu\u1ed9c t\u00ednh t\u1eadp l\u1ec7nh \u2192 th\u00eam\n *   TG_TOKEN = token bot (t\u1eeb @BotFather)   TG_CHAT = chat id c\u1ee7a b\u1ea1n\n * Token ch\u1ec9 n\u1eb1m trong Google c\u1ee7a b\u1ea1n, trang Bookmap kh\u00f4ng bao gi\u1edd th\u1ea5y token.\n * Sau khi th\u00eam, ch\u1ea1y h\u00e0m thuTelegram() m\u1ed9t l\u1ea7n (n\u00fat \u25b6 Ch\u1ea1y) \u0111\u1ec3 c\u1ea5p quy\u1ec1n v\u00e0 th\u1eed g\u1eedi.\n */\nconst SHEET_NAME = 'lenh_giay';\nconst SHEET_ID = '';   // \u0111\u1ec3 tr\u1ed1ng n\u1ebfu t\u1ea1o Apps Script t\u1eeb menu c\u1ee7a Sheet; n\u1ebfu t\u1ea1o d\u1ef1 \u00e1n ri\u00eang th\u00ec d\u00e1n ID c\u1ee7a Sheet v\u00e0o \u0111\u00e2y\nconst HEAD = ['id', 'json', 'gio_vao', 'gio_ra', 'giu_phut', 'ma', 'setup', 'huong', 'ly_do', 'vao', 'sl', 'tp', 'thoat', 'cach_dong',\n  'R', 'R_phi_0.08%', 'do_lon_usd', 'tuong_dung_usd', 'tuong_dung_giay', 'mfe_R', 'mae_R',\n  'dk_thuan_xu_huong', 'dk_cvd_cung_chieu', 'dk_so_nghieng', 'dk_kl_tang', 'dk_phien_au_my', 'keo_A_chuan',\n  'xh10_pct', 'cvd60_usd', 'so_lech', 'kl_x', 'bien_dong5_pct', 'spread_bps'];\nconst SETUP_NAME = { A: 'A \u00b7 B\u1eadt t\u01b0\u1eddng', B: 'B \u00b7 Ph\u00e1 t\u01b0\u1eddng', C: 'C \u00b7 R\u00fat t\u01b0\u1eddng', D: 'D \u00b7 Sau thanh l\u00fd' };\n\n// m\u1ed9t l\u1ec7nh (JSON t\u1eeb trang Bookmap) -> m\u1ed9t d\u00f2ng \u0111\u1ea7y \u0111\u1ee7 c\u1ed9t \u0111\u1ec3 \u0111\u1ecdc / l\u1ecdc / v\u1ebd tr\u00ean Sheet\nfunction row_(o) {\n  const f = o.f || null, raw = o.raw || {}, v = x => (x === undefined || x === null || x === '') ? '' : x;\n  const b = k => f ? (f[k] ? 1 : 0) : '';\n  const r8 = (o.R != null && o.risk) ? Math.round((o.R - (0.0008 - (o.fee || 0.0005)) * o.entry / o.risk) * 1000) / 1000 : '';\n  const keo = (o.setup === 'A' && (o.sym === 'BTCUSDT' || o.sym === 'ETHUSDT') && f && f.book && !f.trend) ? 1 : 0;\n  return [\"'\" + String(o.id), JSON.stringify(o), new Date(o.t), o.tx ? new Date(o.tx) : '', o.tx ? Math.round((o.tx - o.t) / 6000) / 10 : '',\n    o.sym, SETUP_NAME[o.setup] || o.setup, o.dir > 0 ? 'Mua' : 'B\u00e1n', v(o.why), o.entry, o.sl, o.tp, o.exit, v(o.how),\n    o.R, r8, v(o.sz && Math.round(o.sz)), v(o.rest != null ? Math.round(o.rest) : ''), v(o.age), v(o.mfe), v(o.mae),\n    b('trend'), b('cvd'), b('book'), b('vol'), b('sess'), keo,\n    v(raw.xh10_pct), v(raw.cvd60_usd), v(raw.so_lech), v(raw.kl_x), v(raw.bien_dong5_pct), v(raw.spread_bps)];\n}\n// ch\u1ea1y 1 l\u1ea7n (n\u00fat \u25b6 Ch\u1ea1y) \u0111\u1ec3 vi\u1ebft l\u1ea1i to\u00e0n b\u1ed9 b\u1ea3ng theo \u0111\u1ee7 c\u1ed9t t\u1eeb d\u1eef li\u1ec7u \u0111\u00e3 l\u01b0u\nfunction lamMoiBang() {\n  const lock = LockService.getScriptLock(); lock.waitLock(30000);\n  try {\n  const sh = sheet_(), n = sh.getLastRow() - 1, list = [];\n  if (n > 0) for (const [js] of sh.getRange(2, 2, n, 1).getValues()) { try { list.push(JSON.parse(js)); } catch (e) {} }\n  list.sort((a, b) => a.t - b.t);\n  sh.clear(); sh.getRange(1, 1, 1, HEAD.length).setValues([HEAD]).setFontWeight('bold'); sh.setFrozenRows(1);\n  if (list.length) sh.getRange(2, 1, list.length, HEAD.length).setValues(list.map(row_));\n  sh.getRange('C:D').setNumberFormat('dd/MM HH:mm:ss'); sh.hideColumns(2);\n  Logger.log('\u0110\u00e3 vi\u1ebft l\u1ea1i ' + list.length + ' l\u1ec7nh');\n  } finally { lock.releaseLock(); }\n}\nfunction sheet_() {\n  const ss = SHEET_ID ? SpreadsheetApp.openById(SHEET_ID) : SpreadsheetApp.getActiveSpreadsheet();\n  let sh = ss.getSheetByName(SHEET_NAME);\n  if (!sh) { sh = ss.insertSheet(SHEET_NAME); sh.appendRow(HEAD); sh.setFrozenRows(1); sh.hideColumns(2); sh.getRange('C:D').setNumberFormat('dd/MM HH:mm:ss'); }\n  return sh;\n}\nfunction out_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }\n\n// Trang Bookmap g\u1ecdi GET khi m\u1edf \u0111\u1ec3 l\u1ea5y l\u1ea1i to\u00e0n b\u1ed9 l\u1ec7nh c\u0169\nfunction doGet() {\n  const sh = sheet_(), n = sh.getLastRow() - 1, trades = [];\n  if (n > 0) for (const [js] of sh.getRange(2, 2, n, 1).getValues()) { try { trades.push(JSON.parse(js)); } catch (e) {} }\n  return out_({ ok: true, trades });\n}\n\nfunction tg_(text) {\n  const p = PropertiesService.getScriptProperties(), tok = p.getProperty('TG_TOKEN'), chat = p.getProperty('TG_CHAT');\n  if (!tok || !chat) return 'ch\u01b0a c\u00e0i TG_TOKEN / TG_CHAT';\n  const r = UrlFetchApp.fetch('https://api.telegram.org/bot' + tok + '/sendMessage', { method: 'post', muteHttpExceptions: true,\n    payload: { chat_id: chat, text: String(text).slice(0, 3500), parse_mode: 'HTML', disable_web_page_preview: 'true' } });\n  return r.getResponseCode() === 200 ? 'ok' : 'Telegram l\u1ed7i ' + r.getResponseCode();\n}\nfunction thuTelegram() { Logger.log(tg_('\u2705 Bookmap mini: \u0111\u00e3 n\u1ed1i Telegram qua Google Sheet')); }\n\n// Trang Bookmap g\u1eedi POST: {trades:[\u2026]} \u0111\u1ec3 l\u01b0u l\u1ec7nh, {tg:{key,text}} \u0111\u1ec3 b\u00e1o Telegram (tr\u00f9ng key th\u00ec b\u1ecf qua)\nfunction doPost(e) {\n  const body0 = JSON.parse(e.postData.contents || '{}');\n  if (body0.tg) {\n    const c = CacheService.getScriptCache(), k = 'tg_' + String(body0.tg.key || '').slice(0, 200);\n    if (body0.tg.key && c.get(k)) return out_({ ok: true, tg: 'tr\u00f9ng, b\u1ecf qua' });\n    const res = tg_(body0.tg.text || ''); if (body0.tg.key && res === 'ok') c.put(k, '1', 21600);\n    return out_({ ok: res === 'ok', tg: res });\n  }\n  const lock = LockService.getScriptLock(); lock.waitLock(20000);\n  try {\n    const body = body0, sh = sheet_(), n = sh.getLastRow() - 1;\n    const ids = new Set(n > 0 ? sh.getRange(2, 1, n, 1).getValues().map(r => String(r[0])) : []);\n    const rows = [];\n    for (const o of body.trades || []) {\n      if (!o || o.id == null) continue; const id = String(o.id); if (ids.has(id)) continue; ids.add(id);\n      rows.push(row_(o));\n    }\n    if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, HEAD.length).setValues(rows);\n    return out_({ ok: true, added: rows.length, total: ids.size });\n  } finally { lock.releaseLock(); }\n}\n";
+const GS_CODE="/**\n * L\u01b0u l\u1ec7nh gi\u1ea5y c\u1ee7a Bookmap mini v\u00e0o Google Sheet.\n * C\u00e1ch c\u00e0i: m\u1edf Google Sheet m\u1edbi \u2192 Ti\u1ec7n \u00edch m\u1edf r\u1ed9ng \u2192 Apps Script \u2192 xo\u00e1 h\u1ebft, d\u00e1n to\u00e0n b\u1ed9 file n\u00e0y \u2192 L\u01b0u\n * \u2192 Tri\u1ec3n khai \u2192 Tri\u1ec3n khai m\u1edbi \u2192 Lo\u1ea1i: \u1ee8ng d\u1ee5ng web \u2192 Th\u1ef1c thi d\u01b0\u1edbi d\u1ea1ng: T\u00f4i \u2192 Ai c\u00f3 quy\u1ec1n truy c\u1eadp: B\u1ea5t k\u1ef3 ai\n * \u2192 Tri\u1ec3n khai \u2192 c\u1ea5p quy\u1ec1n \u2192 ch\u00e9p \"URL \u1ee9ng d\u1ee5ng web\" (\u2026/exec) d\u00e1n v\u00e0o Bookmap: \u2699 \u2192 \u0110\u1ed3ng b\u1ed9 Google Sheet.\n * Kh\u00f4ng c\u1ea7n m\u1eadt kh\u1ea9u hay API key. Ai c\u00f3 URL n\u00e0y \u0111\u1ec1u ghi/\u0111\u1ecdc \u0111\u01b0\u1ee3c sheet, n\u00ean \u0111\u1eebng chia s\u1ebb URL.\n *\n * B\u00e1o Telegram (tu\u1ef3 ch\u1ecdn): Apps Script \u2192 \u2699 C\u00e0i \u0111\u1eb7t d\u1ef1 \u00e1n \u2192 Thu\u1ed9c t\u00ednh t\u1eadp l\u1ec7nh \u2192 th\u00eam\n *   TG_TOKEN = token bot (t\u1eeb @BotFather)   TG_CHAT = chat id c\u1ee7a b\u1ea1n\n * Token ch\u1ec9 n\u1eb1m trong Google c\u1ee7a b\u1ea1n, trang Bookmap kh\u00f4ng bao gi\u1edd th\u1ea5y token.\n * Sau khi th\u00eam, ch\u1ea1y h\u00e0m thuTelegram() m\u1ed9t l\u1ea7n (n\u00fat \u25b6 Ch\u1ea1y) \u0111\u1ec3 c\u1ea5p quy\u1ec1n v\u00e0 th\u1eed g\u1eedi.\n */\nconst SHEET_NAME = 'lenh_giay';\nconst SHEET_ID = '';   // \u0111\u1ec3 tr\u1ed1ng n\u1ebfu t\u1ea1o Apps Script t\u1eeb menu c\u1ee7a Sheet; n\u1ebfu t\u1ea1o d\u1ef1 \u00e1n ri\u00eang th\u00ec d\u00e1n ID c\u1ee7a Sheet v\u00e0o \u0111\u00e2y\nconst HEAD = ['id', 'json', 'gio_vao', 'gio_ra', 'giu_phut', 'ma', 'setup', 'huong', 'ly_do', 'vao', 'sl', 'tp', 'thoat', 'cach_dong',\n  'R', 'R_phi_0.08%', 'do_lon_usd', 'tuong_dung_usd', 'tuong_dung_giay', 'mfe_R', 'mae_R',\n  'dk_thuan_xu_huong', 'dk_cvd_cung_chieu', 'dk_so_nghieng', 'dk_kl_tang', 'dk_phien_au_my', 'keo_A_chuan',\n  'xh10_pct', 'cvd60_usd', 'so_lech', 'kl_x', 'bien_dong5_pct', 'spread_bps'];\nconst SETUP_NAME = { A: 'A \u00b7 B\u1eadt t\u01b0\u1eddng', B: 'B \u00b7 Ph\u00e1 t\u01b0\u1eddng', C: 'C \u00b7 R\u00fat t\u01b0\u1eddng', D: 'D \u00b7 Sau thanh l\u00fd', E: 'E \u00b7 B\u1eaby ph\u00e1 t\u01b0\u1eddng', F: 'F \u00b7 B\u1eaby r\u00fat t\u01b0\u1eddng' };\n\n// m\u1ed9t l\u1ec7nh (JSON t\u1eeb trang Bookmap) -> m\u1ed9t d\u00f2ng \u0111\u1ea7y \u0111\u1ee7 c\u1ed9t \u0111\u1ec3 \u0111\u1ecdc / l\u1ecdc / v\u1ebd tr\u00ean Sheet\nfunction row_(o) {\n  const f = o.f || null, raw = o.raw || {}, v = x => (x === undefined || x === null || x === '') ? '' : x;\n  const b = k => f ? (f[k] ? 1 : 0) : '';\n  const r8 = (o.R != null && o.risk) ? Math.round((o.R - (0.0008 - (o.fee || 0.0005)) * o.entry / o.risk) * 1000) / 1000 : '';\n  const keo = (o.setup === 'A' && (o.sym === 'BTCUSDT' || o.sym === 'ETHUSDT') && f && f.book && !f.trend) ? 1 : 0;\n  return [\"'\" + String(o.id), JSON.stringify(o), new Date(o.t), o.tx ? new Date(o.tx) : '', o.tx ? Math.round((o.tx - o.t) / 6000) / 10 : '',\n    o.sym, SETUP_NAME[o.setup] || o.setup, o.dir > 0 ? 'Mua' : 'B\u00e1n', v(o.why), o.entry, o.sl, o.tp, o.exit, v(o.how),\n    o.R, r8, v(o.sz && Math.round(o.sz)), v(o.rest != null ? Math.round(o.rest) : ''), v(o.age), v(o.mfe), v(o.mae),\n    b('trend'), b('cvd'), b('book'), b('vol'), b('sess'), keo,\n    v(raw.xh10_pct), v(raw.cvd60_usd), v(raw.so_lech), v(raw.kl_x), v(raw.bien_dong5_pct), v(raw.spread_bps)];\n}\n// ch\u1ea1y 1 l\u1ea7n (n\u00fat \u25b6 Ch\u1ea1y) \u0111\u1ec3 vi\u1ebft l\u1ea1i to\u00e0n b\u1ed9 b\u1ea3ng theo \u0111\u1ee7 c\u1ed9t t\u1eeb d\u1eef li\u1ec7u \u0111\u00e3 l\u01b0u\nfunction lamMoiBang() {\n  const lock = LockService.getScriptLock(); lock.waitLock(30000);\n  try {\n  const sh = sheet_(), n = sh.getLastRow() - 1, list = [];\n  if (n > 0) for (const [js] of sh.getRange(2, 2, n, 1).getValues()) { try { list.push(JSON.parse(js)); } catch (e) {} }\n  list.sort((a, b) => a.t - b.t);\n  sh.clear(); sh.getRange(1, 1, 1, HEAD.length).setValues([HEAD]).setFontWeight('bold'); sh.setFrozenRows(1);\n  if (list.length) sh.getRange(2, 1, list.length, HEAD.length).setValues(list.map(row_));\n  sh.getRange('C:D').setNumberFormat('dd/MM HH:mm:ss'); sh.hideColumns(2);\n  Logger.log('\u0110\u00e3 vi\u1ebft l\u1ea1i ' + list.length + ' l\u1ec7nh');\n  } finally { lock.releaseLock(); }\n}\nfunction sheet_() {\n  const ss = SHEET_ID ? SpreadsheetApp.openById(SHEET_ID) : SpreadsheetApp.getActiveSpreadsheet();\n  let sh = ss.getSheetByName(SHEET_NAME);\n  if (!sh) { sh = ss.insertSheet(SHEET_NAME); sh.appendRow(HEAD); sh.setFrozenRows(1); sh.hideColumns(2); sh.getRange('C:D').setNumberFormat('dd/MM HH:mm:ss'); }\n  return sh;\n}\nfunction out_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }\n\n// Trang Bookmap g\u1ecdi GET khi m\u1edf \u0111\u1ec3 l\u1ea5y l\u1ea1i to\u00e0n b\u1ed9 l\u1ec7nh c\u0169\nfunction doGet() {\n  const sh = sheet_(), n = sh.getLastRow() - 1, trades = [];\n  if (n > 0) for (const [js] of sh.getRange(2, 2, n, 1).getValues()) { try { trades.push(JSON.parse(js)); } catch (e) {} }\n  return out_({ ok: true, trades });\n}\n\nfunction tg_(text) {\n  const p = PropertiesService.getScriptProperties(), tok = p.getProperty('TG_TOKEN'), chat = p.getProperty('TG_CHAT');\n  if (!tok || !chat) return 'ch\u01b0a c\u00e0i TG_TOKEN / TG_CHAT';\n  const r = UrlFetchApp.fetch('https://api.telegram.org/bot' + tok + '/sendMessage', { method: 'post', muteHttpExceptions: true,\n    payload: { chat_id: chat, text: String(text).slice(0, 3500), parse_mode: 'HTML', disable_web_page_preview: 'true' } });\n  return r.getResponseCode() === 200 ? 'ok' : 'Telegram l\u1ed7i ' + r.getResponseCode();\n}\nfunction thuTelegram() { Logger.log(tg_('\u2705 Bookmap mini: \u0111\u00e3 n\u1ed1i Telegram qua Google Sheet')); }\n\n// Trang Bookmap g\u1eedi POST: {trades:[\u2026]} \u0111\u1ec3 l\u01b0u l\u1ec7nh, {tg:{key,text}} \u0111\u1ec3 b\u00e1o Telegram (tr\u00f9ng key th\u00ec b\u1ecf qua)\nfunction doPost(e) {\n  const body0 = JSON.parse(e.postData.contents || '{}');\n  if (body0.tg) {\n    const c = CacheService.getScriptCache(), k = 'tg_' + String(body0.tg.key || '').slice(0, 200);\n    if (body0.tg.key && c.get(k)) return out_({ ok: true, tg: 'tr\u00f9ng, b\u1ecf qua' });\n    const res = tg_(body0.tg.text || ''); if (body0.tg.key && res === 'ok') c.put(k, '1', 21600);\n    return out_({ ok: res === 'ok', tg: res });\n  }\n  const lock = LockService.getScriptLock(); lock.waitLock(20000);\n  try {\n    const body = body0, sh = sheet_(), n = sh.getLastRow() - 1;\n    const ids = new Set(n > 0 ? sh.getRange(2, 1, n, 1).getValues().map(r => String(r[0])) : []);\n    const rows = [];\n    for (const o of body.trades || []) {\n      if (!o || o.id == null) continue; const id = String(o.id); if (ids.has(id)) continue; ids.add(id);\n      rows.push(row_(o));\n    }\n    if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, HEAD.length).setValues(rows);\n    return out_({ ok: true, added: rows.length, total: ids.size });\n  } finally { lock.releaseLock(); }\n}\n";
 const SYNC={url:"",busy:false,lastErr:""};
 try{ const h=new URLSearchParams(location.hash.slice(1)).get("sync")||new URLSearchParams(location.search).get("sync");
   SYNC.url=h||localStorage.getItem("bm_sync")||""; if(h) localStorage.setItem("bm_sync",h); }catch(e){}
@@ -968,9 +990,9 @@ function tgNotify(key,text){ if(!SYNC.url||!RULE.tgA) return;
   fetch(SYNC.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({tg:{key,text}}),redirect:"follow"})
     .then(r=>r.json()).then(j=>{ if(!j.ok&&j.tg) synStatus("Telegram: "+j.tg,"neg"); }).catch(()=>{}); }
 const fpx=(v,ref)=>{ const d=ref>=1000?1:ref>=10?2:ref>=1?3:6; return (+v).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d}); };
-function tgOpen(o){ if(!isH1(o)) return; const c=o.sym.replace(/USDT$/,"");
+function tgOpen(o){ if(!isWatch(o)) return; const c=o.sym.replace(/USDT$/,"");
   tgNotify(o.id+":o",`${o.dir>0?"🟢 <b>MUA":"🔴 <b>BÁN"} ${c}</b>\nVào: ${fpx(o.entry,o.entry)}\nSL: ${fpx(o.sl,o.entry)}\nTP: ${fpx(o.tp,o.entry)}`); }
-function tgClose(o){ if(!isH1(o)) return; const c=o.sym.replace(/USDT$/,""), h=/TP/.test(o.how)?"chạm TP":/SL/.test(o.how)?"chạm SL":"hết 30 phút";
+function tgClose(o){ if(!isWatch(o)) return; const c=o.sym.replace(/USDT$/,""), h=/TP/.test(o.how)?"chạm TP":/SL/.test(o.how)?"chạm SL":`hết ${Math.round((o.hold||1800000)/60000)} phút`;
   tgNotify(o.id+":c",`${o.R>0?"✅":"❌"} ${o.dir>0?"MUA":"BÁN"} ${c} — ${h} (${o.R>0?"+":""}${o.R.toFixed(2)}R)`); }
 function parseCSV(t){ const rows=[]; let row=[], f="", q=false;
   for(let i=0;i<t.length;i++){ const c=t[i];
