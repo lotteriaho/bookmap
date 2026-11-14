@@ -264,8 +264,45 @@ function onLiq(price,qty,sideSell,t){
 
 // ---------- lệnh giấy tự động ----------
 const SETUP={A:"A · Bật tường",B:"B · Phá tường",C:"C · Rút tường",D:"D · Sau thanh lý"};
-function loadSigs(){ try{ const j=JSON.parse(localStorage.getItem("bm_sigs")||"[]"); if(Array.isArray(j)) S.sigClosed=j; }catch(e){} }
-function saveSigs(){ try{ localStorage.setItem("bm_sigs",JSON.stringify(S.sigClosed.slice(-3000))); }catch(e){} }
+function loadSigs(){ try{ const j=JSON.parse(localStorage.getItem("bm_sigs")||"[]"); if(Array.isArray(j)) S.sigClosed=j; }catch(e){}
+  try{ const j=JSON.parse(localStorage.getItem("bm_sigopen")||"[]"); if(Array.isArray(j)) S.sigOpen=j.filter(o=>o.sym!=="DEMO"); }catch(e){} }
+function saveSigs(){ try{ localStorage.setItem("bm_sigs",JSON.stringify(S.sigClosed.slice(-3000))); localStorage.setItem("bm_sigopen",JSON.stringify(S.sigOpen.filter(o=>o.sym!=="DEMO"))); }catch(e){} }
+// lệnh đang mở được theo dõi trực tiếp -> ghi lại mốc đã kiểm tra
+function touchSigs(){ const live=S.mkt!=="demo"&&S.synced&&!S.paused; if(live) for(const o of S.sigOpen) if(o.sym===S.sym&&(o.mkt||"fut")===S.mkt&&Date.now()-(o.chk||o.t)<30000) o.chk=Date.now(); saveSigs(); }
+async function fetchKlines(kind,sym,start,limit){
+  const qs=`symbol=${sym}&interval=1m&startTime=${Math.floor(start/60000)*60000}&limit=${limit}`;
+  const urls=kind==="fut"?[`https://fapi.binance.com/fapi/v1/klines?${qs}`,`https://data-api.binance.vision/api/v3/klines?${qs.replace(/^symbol=1000/,"symbol=")}`]:[`https://api.binance.com/api/v3/klines?${qs}`,`https://data-api.binance.vision/api/v3/klines?${qs}`];
+  for(const u of urls){ try{ const r=await fetch(u,{cache:"no-store"}); if(!r.ok) continue; let K=await r.json(); if(!Array.isArray(K)) continue;
+      if(kind==="fut"&&/^1000/.test(sym)&&u.includes("binance.vision")) // giá spot PEPE = giá 1000PEPE / 1000
+        K=K.map(k=>[k[0],...[1,2,3,4].map(j=>String(+(k[j]*1000).toPrecision(8))),String(k[5]/1000),k[6],k[7],k[8],String(k[9]/1000)]);
+      return K; }catch(e){} }
+  return null;
+}
+// chấm các lệnh giấy đang mở trong lúc trang bị đóng / đang xem mã khác, bằng nến 1 phút
+async function resolveOpen(all){
+  const now=Date.now(), bySym=new Map();
+  for(const o of S.sigOpen){ const mkt=o.mkt||"fut";
+    if(!all&&o.sym===S.sym&&mkt===S.mkt&&now-(o.chk||o.t)<30000) continue;   // mã đang xem đã được chấm trực tiếp
+    const from=Math.max(o.t,o.chk||o.t); if(now-from<5000) continue;
+    const key=mkt+":"+o.sym; if(!bySym.has(key)) bySym.set(key,{mkt,sym:o.sym,from,list:[]});
+    const g=bySym.get(key); g.from=Math.min(g.from,from); g.list.push(o); }
+  let done=0;
+  for(const g of bySym.values()){
+    const K=await fetchKlines(g.mkt,g.sym,g.from,Math.min(1000,Math.ceil((now-g.from)/60000)+2));
+    if(!K||!K.length){ for(const o of g.list){ o.fails=(o.fails||0)+1; if(o.fails>=3) o.chk=Date.now(); } continue; }  // không lấy được nến 3 lần -> bỏ qua đoạn trống
+    for(const o of g.list){ if(o.status!=="open"||!S.sigOpen.includes(o)) continue;
+      const from=Math.max(o.t,o.chk||o.t), exp=o.t+1800000; let closed=false;
+      for(const k of K){ const t0=+k[0]; if(t0+60000<=from) continue;
+        const hi=+k[2], lo=+k[3], cl=+k[4];
+        const sl=o.dir>0?lo<=o.sl:hi>=o.sl, tp=o.dir>0?hi>=o.tp:lo<=o.tp;
+        if(sl){ closeSignal(o,o.sl,"chạm SL (nến 1m)"); closed=true; break; }   // cùng nến chạm cả 2 -> tính SL cho chắc
+        if(tp){ closeSignal(o,o.tp,"chạm TP (nến 1m)"); closed=true; break; }
+        if(t0+60000>=exp&&exp<=now){ closeSignal(o,cl,"hết 30 phút (nến 1m)"); closed=true; break; }
+      }
+      if(closed) done++; else { o.chk=Date.now(); o.fails=0; } }
+  }
+  saveSigs(); if(done){ renderStats(); toast(`Đã chấm ${done} lệnh giấy mở trong lúc đóng trang / xem mã khác`); }
+}
 function recentRange(sec){ const n=Math.max(4,Math.round(sec*1000/S.speed)); let lo=Infinity,hi=-Infinity;
   for(let i=Math.max(0,S.cols.length-n);i<S.cols.length;i++){ lo=Math.min(lo,S.cols[i].bid); hi=Math.max(hi,S.cols[i].ask); } return isFinite(lo)?hi-lo:0; }
 function openSignal(setup,dir,ref,why,rr=2){
@@ -277,8 +314,8 @@ function openSignal(setup,dir,ref,why,rr=2){
   let sl=dir>0?Math.min(ref-2*B,px-minRisk):Math.max(ref+2*B,px+minRisk);
   const risk=Math.abs(px-sl); if(risk>px*0.012) return;           // SL quá xa thì bỏ
   const tp=px+dir*rr*risk;
-  const o={id:Date.now()+Math.random(),t:Date.now(),sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open"};
-  S.sigOpen.push(o);
+  const o={id:Date.now()+Math.random(),t:Date.now(),chk:Date.now(),mkt:S.mkt,sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open"};
+  S.sigOpen.push(o); saveSigs();
   addEvent("sig",px,`Lệnh giấy ${SETUP[setup]}: ${dir>0?"MUA":"BÁN"} @ ${fp(px)} · SL ${fp(sl)} · TP ${fp(tp)}`,true);
   renderStats();
 }
@@ -286,12 +323,13 @@ function closeSignal(o,exit,how){
   o.exit=exit; o.tx=Date.now(); o.how=how; o.status="closed";
   o.R=+((o.dir*(exit-o.entry)-o.fee*o.entry)/o.risk).toFixed(3);
   S.sigOpen=S.sigOpen.filter(x=>x!==o); S.sigClosed.push(o); saveSigs();
-  addEvent(o.R>0?"win":"loss",exit,`Lệnh giấy ${SETUP[o.setup]} ${o.dir>0?"MUA":"BÁN"} đóng ${how} @ ${fp(exit)} · ${o.R>0?"+":""}${o.R.toFixed(2)}R`,false);
+  if(o.sym===(S.mkt==="demo"?"DEMO":S.sym)) addEvent(o.R>0?"win":"loss",exit,`Lệnh giấy ${SETUP[o.setup]} ${o.dir>0?"MUA":"BÁN"} đóng ${how} @ ${fp(exit)} · ${o.R>0?"+":""}${o.R.toFixed(2)}R`,false);
   renderStats();
 }
 function checkSignals(bid,ask){
   if(!S.sigOpen.length) return; const now=Date.now(), sym=S.mkt==="demo"?"DEMO":S.sym;
-  for(const o of [...S.sigOpen]){ if(o.sym!==sym) continue;
+  for(const o of [...S.sigOpen]){ if(o.sym!==sym||(o.mkt||"fut")!==S.mkt&&sym!=="DEMO") continue;
+    if(sym!=="DEMO"&&now-(o.chk||o.t)>30000) continue;   // đang chờ chấm bằng nến 1m cho đoạn bị đóng trang
     if(o.dir>0){ if(bid<=o.sl) closeSignal(o,o.sl,"chạm SL"); else if(bid>=o.tp) closeSignal(o,o.tp,"chạm TP"); else if(now-o.t>1800000) closeSignal(o,bid,"hết 30 phút"); }
     else { if(ask>=o.sl) closeSignal(o,o.sl,"chạm SL"); else if(ask<=o.tp) closeSignal(o,o.tp,"chạm TP"); else if(now-o.t>1800000) closeSignal(o,ask,"hết 30 phút"); } }
 }
@@ -598,12 +636,7 @@ async function restoreHist(kind,gen){
 }
 // Lấp khoảng trống bằng nến 1 phút: có giá + khối lượng mua/bán chủ động, KHÔNG có sổ lệnh (Binance không cho lấy sổ lệnh quá khứ)
 async function backfill(kind,from,to,gen){
-  const qs=`symbol=${S.sym}&interval=1m&startTime=${Math.floor(from/60000)*60000}&limit=60`;
-  const urls=kind==="fut"?[`https://fapi.binance.com/fapi/v1/klines?${qs}`,`https://data-api.binance.vision/api/v3/klines?${qs.replace(/^symbol=1000/,"symbol=")}`]:[`https://api.binance.com/api/v3/klines?${qs}`,`https://data-api.binance.vision/api/v3/klines?${qs}`];
-  let K=null; for(const u of urls){ try{ const r=await fetch(u,{cache:"no-store"}); if(r.ok){ K=await r.json();
-      if(kind==="fut"&&/^1000/.test(S.sym)&&u.includes("binance.vision")&&Array.isArray(K)) // giá spot PEPE = giá 1000PEPE / 1000
-        K=K.map(k=>[k[0],...[1,2,3,4].map(j=>String(+(k[j]*1000).toPrecision(8))),String(k[5]/1000),k[6],k[7],k[8],String(k[9]/1000)]);
-      break; } }catch(e){} }
+  const K=await fetchKlines(kind,S.sym,from,60);
   if(gen!==S.gen||!Array.isArray(K)||!K.length) return 0;
   for(const k of K) for(const j of [1,2,3,4]) noteTick(String(k[j]));
   if(!S.bucket) ensureBucket(+K[K.length-1][4]);
@@ -621,9 +654,10 @@ async function backfill(kind,from,to,gen){
   if(S.center==null&&S.last!=null) S.center=S.last;
   return made*S.speed/60000;
 }
-setInterval(saveHist,10000);
-document.addEventListener("visibilitychange",()=>{ if(document.hidden) saveHist(); });
-window.addEventListener("pagehide",()=>{ saveHist(); });
+setInterval(()=>{ saveHist(); touchSigs(); },10000);
+setInterval(()=>resolveOpen(false),60000);
+document.addEventListener("visibilitychange",()=>{ if(document.hidden){ saveHist(); touchSigs(); } });
+window.addEventListener("pagehide",()=>{ saveHist(); touchSigs(); });
 
 // ---------- demo data ----------
 function startDemo(fromFail){
@@ -713,7 +747,7 @@ ov.addEventListener("pointermove",e=>{ if(!drag||S.center==null) return; const d
 ov.addEventListener("pointerup",()=>{drag=null;});
 
 // ---------- boot ----------
-resize(); loadSigs(); startClock(); requestAnimationFrame(frame); setInterval(renderStats,5000);
+resize(); loadSigs(); setTimeout(()=>resolveOpen(true),1500); startClock(); requestAnimationFrame(frame); setInterval(renderStats,5000);
 const q=new URLSearchParams(location.search);
 let saved=null; try{saved=localStorage.getItem("bm_sym");}catch(e){}
 S.sym=(q.get("sym")||saved||"BTCUSDT").toUpperCase(); $("symin").value=S.sym;
