@@ -42,22 +42,44 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 #ev.min #evl{display:none}
 .plbar{display:inline-block;width:46px;height:6px;border-radius:3px;background:rgba(255,255,255,.12);vertical-align:middle;margin:0 4px;overflow:hidden}
 .plbar i{display:block;height:100%}.plbar i.pos{background:#22c58b}.plbar i.neg{background:#ef5350}
-#st2{position:absolute;right:12px;bottom:12px;width:min(620px,calc(100% - 16px));height:min(360px,calc(100% - 16px));min-width:300px;min-height:150px;max-width:calc(100% - 8px);max-height:calc(100% - 8px);resize:both;overflow:hidden;background:rgba(14,20,31,.96);border:1px solid var(--line);border-radius:10px;z-index:6;display:flex;flex-direction:column;font-size:12px;box-shadow:0 8px 30px rgba(0,0,0,.45)}
-#st2 header{all:unset;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line)}
-#st2 .grip{cursor:move;user-select:none;touch-action:none;color:var(--mut);font-size:15px;padding:2px 4px;display:flex;align-items:center;gap:6px;flex:1;min-width:120px}
-#st2 .grip h2{font-size:13px;margin:0}
-#toast{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);background:#1d2736;border:1px solid var(--line);color:var(--fg);padding:7px 12px;border-radius:8px;font-size:12px;z-index:9;pointer-events:none}
-#st2 h2{margin:0;font-size:14px;flex:1;min-width:140px}
-#st2 .body{overflow:auto;padding:10px 12px;display:flex;flex-direction:column;gap:12px;min-height:0}
-#st2 table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
-#st2 th,#st2 td{padding:5px 8px;border-bottom:1px solid rgba(34,48,71,.7);text-align:right;white-space:nowrap}
-#st2 th:first-child,#st2 td:first-child{text-align:left}
-#st2 th{color:var(--mut);font-weight:600;font-size:11px}
+#st2{position:absolute;right:12px;bottom:12px;width:min(400px,calc(100% - 16px));height:min(560px,calc(100% - 16px));min-width:280px;min-height:180px;max-width:calc(100% - 8px);max-height:calc(100% - 8px);resize:both;overflow:hidden;background:rgba(14,20,31,.96);border:1px solid var(--line);border-radius:10px;z-index:6;display:flex;flex-direction:column;font-size:12px;box-shadow:0 8px 30px rgba(0,0,0,.45)}
+#st2 header{all:unset;display:flex;gap:6px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--line)}
+#st2 .grip{cursor:move;user-select:none;touch-action:none;color:var(--mut);font-size:15px;padding:2px 4px;display:flex;align-items:center;gap:6px;flex:1;min-width:0}
+#st2 .grip h2{font-size:13px;margin:0;color:var(--fg);white-space:nowrap}
+#st2 header select{font-size:12px;padding:3px 4px;max-width:130px}
+#st2 .ib{width:28px;height:28px;padding:0;display:grid;place-items:center;font-size:13px}
+#st2 .ib.on{border-color:#f4b43a;color:#f4b43a}
+#st2 .cfg{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}
+#st2 .cfg[hidden]{display:none}
+#st2 .cfg label{display:flex;gap:6px;align-items:center;color:var(--mut);font-size:11px}
+#st2 .cfg details{flex-basis:100%}
+#st2 .body{overflow:auto;padding:10px;display:flex;flex-direction:column;gap:10px;min-height:0;flex:1;font-variant-numeric:tabular-nums}
 #st2 .pos{color:var(--buy)} #st2 .neg{color:var(--sell)} #st2 .mut{color:var(--mut)}
-#st2 .tw{overflow-x:auto}
-#st2 .note{color:var(--mut);line-height:1.5}
+#st2 .note{color:var(--mut);line-height:1.5;font-size:12px}
 #st2 details summary{cursor:pointer;color:var(--fg)}
-#st2 .body{flex:1}
+#st2 .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(62px,1fr));gap:6px}
+#st2 .kpi div{background:rgba(255,255,255,.04);border:1px solid rgba(34,48,71,.8);border-radius:8px;padding:6px 8px;min-width:0}
+#st2 .kpi b{display:block;font:700 16px var(--mono);white-space:nowrap}
+#st2 .kpi span{color:var(--mut);font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}
+#st2 .setups{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;column-gap:12px;row-gap:2px;align-items:center;font-size:12.5px}
+#st2 .setups .h{color:var(--mut);font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;padding-bottom:2px}
+#st2 .setups .r{text-align:right;font-family:var(--mono)}
+#st2 .setups .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#st2 .setups .nm i{font-style:normal;display:inline-block;width:18px;font-weight:700;color:#f4b43a}
+#st2 .sec{color:var(--mut);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;border-top:1px solid var(--line);padding-top:8px;display:flex;justify-content:space-between}
+#st2 .oc{border:1px solid rgba(34,48,71,.9);border-left:3px solid var(--mut);border-radius:8px;padding:7px 9px;margin-bottom:6px;background:rgba(255,255,255,.03)}
+#st2 .oc.up{border-left-color:var(--buy)} #st2 .oc.dn{border-left-color:var(--sell)}
+#st2 .oc .l1,#st2 .oc .l2,#st2 .oc .l3{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#st2 .oc .l1 b{font-size:12.5px} #st2 .oc .big{font:700 16px var(--mono)}
+#st2 .oc .l2{font:12px var(--mono);margin-top:3px} #st2 .oc .l3{color:var(--mut);font-size:11px;margin-top:4px}
+#st2 .oc .plbar{flex:1;width:auto;max-width:none;margin:0}
+#st2 .cl{display:grid;grid-template-columns:auto minmax(0,auto) minmax(0,1fr) auto auto;column-gap:10px;align-items:center;font-size:12px}
+#st2 .cl>div{padding:4px 0;border-bottom:1px solid rgba(34,48,71,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#st2 .cl .px{font-family:var(--mono);color:var(--mut);font-size:11.5px}
+#st2 .cl .rr{text-align:right;font:700 12.5px var(--mono)}
+#st2 .tag{font-size:10px;padding:1px 5px;border-radius:4px;background:rgba(255,255,255,.07);color:var(--mut)}
+#st2 .tag.tp{color:var(--buy);background:rgba(34,197,139,.12)} #st2 .tag.sl{color:var(--sell);background:rgba(239,83,80,.12)}
+#st2 .empty2{color:var(--mut);font-size:12px;padding:4px 0}
 #help{position:absolute;right:160px;top:10px;z-index:4;max-width:360px;background:rgba(17,23,34,.92);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--mut)}
 #help b{color:var(--fg)} #help .x{float:right;cursor:pointer;color:var(--fg)}
 .k{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:-1px;margin-right:4px}
@@ -90,15 +112,20 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
   <canvas id="ov"></canvas>
   <div id="toast" hidden></div>
   <div id="st2" hidden>
-    <header><div class="grip" id="stgrip" title="Kéo để di chuyển">⠿ <h2>Thống kê lệnh giấy</h2></div><button id="stpop" title="Mở ra cửa sổ riêng">⧉</button>
-      <label>Xem <select id="stsym"><option value="cur">Mã đang xem</option><option value="all">Tất cả mã</option></select></label>
+    <header><div class="grip" id="stgrip" title="Kéo để di chuyển">⠿ <h2>Lệnh giấy</h2></div>
+      <select id="stsym" title="Mã hiển thị"><option value="cur">Mã đang xem</option><option value="all">Tất cả mã</option></select>
+      <button id="stcfg" class="ib" title="Phí, xuất CSV, xóa dữ liệu">⚙</button><button id="stpop" class="ib" title="Mở ra cửa sổ riêng">⧉</button><button id="stx" class="ib" title="Ẩn bảng">✕</button></header>
+    <div class="cfg" id="stcfgp" hidden>
       <label>Phí + trượt <select id="fee"><option value="0.0003">0,03%</option><option value="0.0005" selected>0,05%</option><option value="0.0008">0,08%</option><option value="0.0012">0,12%</option></select></label>
-      <button id="csv">Xuất CSV</button><button id="clr">Xóa dữ liệu</button><button id="stx" title="Ẩn bảng">✕</button></header>
-    <div class="body">
-      <div class="tw"><table id="sttab"></table></div>
-      <details class="note"><summary>Cách tool tạo và chấm lệnh giấy</summary>Mỗi sự kiện đủ điều kiện tự tạo một <b>lệnh giấy</b> (không đặt lệnh thật): vào ở giá hiện tại, SL sau mức giá của sự kiện, TP = 2R (setup D: 1,5R), tối đa 30 phút rồi đóng theo giá. R đã trừ phí + trượt khứ hồi đã chọn. Dữ liệu lưu trong trình duyệt này, kể cả khi tắt trang.<br>
+      <button id="csv">Xuất CSV</button><button id="clr">Xóa dữ liệu</button>
+      <details class="note"><summary>Cách tool tạo và chấm lệnh giấy</summary>Mỗi sự kiện đủ điều kiện tự tạo một <b>lệnh giấy</b> (không đặt lệnh thật): vào ở giá hiện tại, SL sau mức giá của sự kiện, TP = 2R (setup D: 1,5R), tối đa 30 phút rồi đóng theo giá. R đã trừ phí + trượt khứ hồi. Dữ liệu lưu trong trình duyệt này, kể cả khi tắt trang.<br>
       <b>A · Bật tường</b>: hấp thụ ■ → vào ngược lực đánh. <b>B · Phá tường</b>: tường bị ăn ⇡ → đi theo hướng phá. <b>C · Rút tường</b>: tường bị rút ✕ → đi theo hướng giá đang tới. <b>D · Sau thanh lý</b>: cụm thanh lý một phía đã dứt 30 giây → vào ngược lại.</details>
-      <div class="tw"><table id="stlist"></table></div>
+    </div>
+    <div class="body">
+      <div class="kpi" id="stkpi"></div>
+      <div class="setups" id="stsetup"></div>
+      <div class="sec" id="stopenh"></div><div id="stopen"></div>
+      <div class="sec" id="stclh"></div><div id="stclosed"></div>
     </div>
   </div>
   <div id="ev"><h3>Sự kiện <button id="evmin">Thu gọn</button></h3><div id="evl"><div class="empty">Chưa có sự kiện. Tường lệnh lớn, tường bị rút/bị phá, hấp thụ và thanh lý sẽ hiện ở đây.</div></div></div>
@@ -347,7 +374,7 @@ const SD=()=>S.statWin&&!S.statWin.closed?S.statWin.document:document;
 function openStatsWindow(){
   const panel=document.getElementById("st2");
   if(S.statWin&&!S.statWin.closed){ S.statWin.focus(); return true; }
-  let w=null; try{ w=window.open("","bm_stats","width=820,height=640"); }catch(e){}
+  let w=null; try{ w=window.open("","bm_stats","width=440,height=720"); }catch(e){}
   if(!w) return false;
   const css=document.querySelector("style").textContent;
   w.document.open(); w.document.write(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Thống kê lệnh giấy · Bookmap</title><style>${css}
@@ -377,20 +404,35 @@ const mmss=ms=>{const s=Math.round(ms/1000); return Math.floor(s/60)+":"+String(
 function renderStats(){
   const D=SD(), el=D.getElementById("st2"); if(!el||el.hidden) return;
   const all=D.getElementById("stsym").value==="all", sym=S.mkt==="demo"?"DEMO":S.sym;
-  const rows=S.sigClosed.filter(o=>all||o.sym===sym);
-  const agg=k=>{ const xs=k?rows.filter(o=>o.setup===k):rows; const n=xs.length, w=xs.filter(o=>o.R>0).length, tot=xs.reduce((a,o)=>a+o.R,0);
-    const wins=xs.filter(o=>o.R>0), loss=xs.filter(o=>o.R<=0);
-    return [n, n?w/n:null, n?tot/n:null, tot, wins.length?wins.reduce((a,o)=>a+o.R,0)/wins.length:null, loss.length?loss.reduce((a,o)=>a+o.R,0)/loss.length:null]; };
-  const f=(v,d=2,pct=false)=>v==null?'<span class="mut">–</span>':`<span class="${v>0?"pos":v<0?"neg":""}">${pct?Math.round(v*100)+"%":(v>0?"+":"")+v.toFixed(d)}</span>`;
-  let h="<tr><th>Setup</th><th>Số lệnh</th><th>Thắng</th><th>R trung bình</th><th>Tổng R</th><th>TB thắng</th><th>TB thua</th><th>Đang mở</th><th>Lãi/lỗ đang mở</th></tr>";
-  for(const k of ["A","B","C","D",null]){ const a=agg(k); const ops=S.sigOpen.filter(o=>(!k||o.setup===k)&&(all||o.sym===sym)), op=ops.length;
-    const pls=ops.map(livePL).filter(Boolean), plR=pls.length?pls.reduce((x,p)=>x+p.R,0):null;
-    h+=`<tr${k?"":' style="font-weight:700"'}><td>${k?SETUP[k]:"Tất cả"}</td><td>${a[0]}</td><td>${a[1]==null?'<span class="mut">–</span>':Math.round(a[1]*100)+"%"}</td><td>${f(a[2])}</td><td>${f(a[3],1)}</td><td>${f(a[4])}</td><td>${f(a[5])}</td><td>${op}</td><td>${op&&plR!=null?f(plR)+"R":'<span class="mut">–</span>'}</td></tr>`; }
-  D.getElementById("sttab").innerHTML=h;
-  let l="<tr><th>Giờ vào</th><th>Mã</th><th>Setup</th><th>Hướng</th><th>Vào</th><th>SL</th><th>TP</th><th>Thoát</th><th>Kết quả</th></tr>";
-  const list=[...S.sigOpen.filter(o=>all||o.sym===sym).map(o=>({...o})), ...rows.slice(-60).reverse()];
-  for(const o of list) l+=`<tr><td>${new Date(o.t).toLocaleString("vi-VN",{hour12:false,day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</td><td>${o.sym}</td><td>${o.setup}</td><td>${o.dir>0?"Mua":"Bán"}</td><td>${fp(o.entry)}</td><td>${fp(o.sl)}</td><td>${fp(o.tp)}</td>${o.exit!=null?`<td>${fp(o.exit)}</td><td>${f(o.R)} <span class='mut'>${o.how}</span></td>`:openCells(o,f)}</tr>`;
-  D.getElementById("stlist").innerHTML=list.length?l:'<tr><td class="mut">Chưa có lệnh giấy nào. Để trang chạy, mỗi sự kiện đủ điều kiện sẽ tự tạo lệnh.</td></tr>';
+  const rows=S.sigClosed.filter(o=>all||o.sym===sym), opens=S.sigOpen.filter(o=>all||o.sym===sym);
+  const sgn=(v,d=2)=>(v>0?"+":"")+v.toFixed(d), cls=v=>v>0?"pos":v<0?"neg":"";
+  const st=xs=>{ const n=xs.length, w=xs.filter(o=>o.R>0).length, tot=xs.reduce((a,o)=>a+o.R,0); return {n,w,wr:n?w/n:null,tot,avg:n?tot/n:null}; };
+  const A=st(rows), pls=opens.map(livePL).filter(Boolean), plR=pls.reduce((a,p)=>a+p.R,0);
+  const kp=(lab,val,c="")=>`<div><span>${lab}</span><b class="${c}">${val}</b></div>`;
+  D.getElementById("stkpi").innerHTML=
+    kp("Tổng R",A.n?sgn(A.tot,1):"–",cls(A.tot))+kp("Thắng",A.wr==null?"–":Math.round(A.wr*100)+"%")+kp("Số lệnh",A.n)+
+    kp("R / lệnh",A.avg==null?"–":sgn(A.avg),cls(A.avg||0));
+  let h='<div class="h">Setup</div><div class="h r">Lệnh</div><div class="h r">Thắng</div><div class="h r">Tổng R</div>';
+  for(const k of ["A","B","C","D"]){ const a=st(rows.filter(o=>o.setup===k)), op=opens.filter(o=>o.setup===k).length;
+    const tip=a.n?`TB/lệnh ${sgn(a.avg)}R`:"Chưa có lệnh";
+    h+=`<div class="nm" title="${tip}"><i>${k}</i>${SETUP[k].split("· ")[1]}${op?` <span class="tag">${op} mở</span>`:""}</div><div class="r">${a.n||'<span class="mut">0</span>'}</div><div class="r">${a.wr==null?'<span class="mut">–</span>':Math.round(a.wr*100)+"%"}</div><div class="r ${cls(a.tot)}">${a.n?sgn(a.tot,1):'<span class="mut">–</span>'}</div>`; }
+  D.getElementById("stsetup").innerHTML=h;
+  // lệnh đang mở
+  D.getElementById("stopenh").innerHTML=`<span>Đang mở (${opens.length})</span>${opens.length?`<span class="${cls(plR)}">${sgn(plR)}R</span>`:""}`;
+  let oh="";
+  for(const o of opens){ const p=livePL(o), up=p&&p.R>=0;
+    const prog=p?(p.R>=0?Math.min(1,p.R/(Math.abs(o.tp-o.entry)/o.risk)):Math.min(1,-p.R)):0;
+    oh+=`<div class="oc ${p?(up?"up":"dn"):""}"><div class="l1"><b>${o.setup} · ${o.dir>0?'<span class="pos">MUA</span>':'<span class="neg">BÁN</span>'}${all?" "+o.sym.replace(/USDT$/,""):""}</b><span class="big ${p?cls(p.R):""}">${p?sgn(p.R)+"R":"…"}</span></div>
+      <div class="l2"><span>${fp(o.entry)} → ${p?fp(p.px):"…"}${p&&p.src==="1m"?' <span class="mut">(1m)</span>':""}</span><span class="${p?cls(p.pct):""}">${p?sgn(p.pct)+"%":""}</span></div>
+      <div class="l3"><span>SL ${fp(o.sl)}</span><span class="plbar"><i class="${up?"pos":"neg"}" style="width:${Math.round(prog*100)}%"></i></span><span>TP ${fp(o.tp)}</span><span>⏱ ${p?mmss(p.left):""}</span></div></div>`; }
+  D.getElementById("stopen").innerHTML=oh||'<div class="empty2">Không có lệnh đang mở.</div>';
+  // lệnh đã đóng
+  D.getElementById("stclh").innerHTML=`<span>Đã đóng (${rows.length})</span><span>60 lệnh gần nhất</span>`;
+  let ch="";
+  for(const o of rows.slice(-60).reverse()){
+    const tag=/TP/.test(o.how)?'<span class="tag tp">TP</span>':/SL/.test(o.how)?'<span class="tag sl">SL</span>':'<span class="tag">30′</span>';
+    ch+=`<div class="mut">${new Date(o.t).toLocaleTimeString("vi-VN",{hour12:false,hour:"2-digit",minute:"2-digit"})}</div><div><b>${o.setup}</b> ${o.dir>0?'<span class="pos">▲</span>':'<span class="neg">▼</span>'}${all?' <span class="mut">'+o.sym.replace(/USDT$/,"")+"</span>":""}</div><div class="px" title="${o.how}">${fp(o.entry)} → ${fp(o.exit)}</div><div>${tag}</div><div class="rr ${cls(o.R)}">${sgn(o.R)}</div>`; }
+  D.getElementById("stclosed").innerHTML=ch?`<div class="cl">${ch}</div>`:'<div class="empty2">Chưa có lệnh đóng. Để trang chạy, mỗi sự kiện đủ điều kiện sẽ tự tạo lệnh.</div>';
 }
 
 // ---------- heatmap drawing (incremental) ----------
@@ -744,6 +786,7 @@ $("statbtn").onclick=()=>{ if(S.statWin&&!S.statWin.closed){ S.statWin.focus(); 
   new ResizeObserver(()=>{ if(!p.hidden&&!S.statWin&&p.style.left) save(); }).observe(p); })();
 $("stpop").onclick=()=>{ if(!openStatsWindow()) toast("Trình duyệt đang chặn cửa sổ bật lên. Cho phép ở thanh địa chỉ rồi bấm lại."); };
 
+$("stcfg").onclick=()=>{ const D=SD(), c=D.getElementById("stcfgp"); c.hidden=!c.hidden; D.getElementById("stcfg").classList.toggle("on",!c.hidden); };
 $("stx").onclick=()=>{ if(S.statWin&&!S.statWin.closed){ S.statWin.close(); return; } document.getElementById("st2").hidden=true; $("statbtn").classList.remove("on"); };
 $("stsym").onchange=()=>{ renderStats(); toast(document.getElementById("stsym").value==="all"?"Đang xem tất cả các mã":"Đang xem mã hiện tại"); };
 $("fee").onchange=e=>{S.fee=+e.target.value; toast("Phí mới áp dụng cho các lệnh giấy mở từ bây giờ");};
