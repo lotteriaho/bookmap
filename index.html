@@ -53,6 +53,12 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 [hidden]{display:none!important}
 #st2 .cfg label{display:flex;gap:6px;align-items:center;color:var(--mut);font-size:11px}
 #st2 .cfg details{flex-basis:100%}
+#st2 .rules{flex-basis:100%;display:grid;grid-template-columns:auto auto auto;gap:5px 10px;align-items:center;font-size:11.5px;color:var(--mut)}
+#st2 .rules .rh{grid-column:1/-1;color:var(--fg);font-size:12px}
+#st2 .rules label{display:flex;gap:5px;align-items:center;color:var(--fg);font-size:11.5px;text-transform:none;letter-spacing:0}
+#st2 .rules select{font-size:11px;padding:1px 3px}
+#st2 .sz{grid-column:1/-1;margin-top:4px;display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;column-gap:12px;row-gap:2px;font-size:12px}
+#st2 .sz .h{color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.03em} #st2 .sz .r{text-align:right;font-family:var(--mono)}
 #st2 .body{overflow:auto;padding:10px;display:flex;flex-direction:column;gap:10px;min-height:0;flex:1;font-variant-numeric:tabular-nums}
 #st2 .pos{color:var(--buy)} #st2 .neg{color:var(--sell)} #st2 .mut{color:var(--mut)}
 #st2 .note{color:var(--mut);line-height:1.5;font-size:12px}
@@ -129,6 +135,20 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
     <div class="cfg" id="stcfgp" hidden>
       <label>Phí + trượt <select id="fee"><option value="0.0003">0,03%</option><option value="0.0005" selected>0,05%</option><option value="0.0008">0,08%</option><option value="0.0012">0,12%</option></select></label>
       <button id="csv">Xuất CSV</button><button id="clr">Xóa dữ liệu</button>
+      <div class="rules" id="strules">
+        <div class="rh">Điều kiện vào lệnh <span class="mut">(lệnh không đạt vẫn hiện ở Sự kiện, chỉ không tạo lệnh giấy)</span></div>
+        <label><input type="checkbox" data-r="onA" checked><b>A · Bật tường</b></label>
+        <span>Hấp thụ ≥ <select data-r="absMin"><option value="0">Tự động</option><option value="250000">250k</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="2000000">2 tr</option><option value="5000000">5 tr</option></select></span>
+        <span>Tường đứng tại mức ≥ <select data-r="restMin"><option value="0">Không cần</option><option value="250000">250k</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="3000000">3 tr</option></select></span>
+        <label><input type="checkbox" data-r="onB" checked><b>B · Phá tường</b></label>
+        <span>Tường ≥ <select data-r="brkMin"><option value="0">Tự động</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="2000000">2 tr</option><option value="5000000">5 tr</option><option value="10000000">10 tr</option></select></span>
+        <span>Đứng ≥ <select data-r="brkAge"><option value="15">15 s</option><option value="30">30 s</option><option value="60">60 s</option><option value="120">2 phút</option></select></span>
+        <label><input type="checkbox" data-r="onC" checked><b>C · Rút tường</b></label>
+        <span>Tường ≥ <select data-r="pullMin"><option value="0">Tự động</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="2000000">2 tr</option><option value="5000000">5 tr</option><option value="10000000">10 tr</option></select></span>
+        <span>Đứng ≥ <select data-r="pullAge"><option value="15">15 s</option><option value="30">30 s</option><option value="60">60 s</option><option value="120">2 phút</option></select></span>
+        <label><input type="checkbox" data-r="onD" checked><b>D · Sau thanh lý</b></label>
+        <span>Cụm thanh lý ≥ <select data-r="liqMinD"><option value="250000">250k</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="3000000">3 tr</option><option value="10000000">10 tr</option></select></span><span></span>
+      </div>
       <details class="note"><summary>Cách tool tạo và chấm lệnh giấy</summary>Mỗi sự kiện đủ điều kiện tự tạo một <b>lệnh giấy</b> (không đặt lệnh thật): vào ở giá hiện tại, SL sau mức giá của sự kiện, TP = 2R (setup D: 1,5R), tối đa 30 phút rồi đóng theo giá. R đã trừ phí + trượt khứ hồi. Dữ liệu lưu trong trình duyệt này, kể cả khi tắt trang.<br>
       <b>A · Bật tường</b>: hấp thụ ■ → vào ngược lực đánh. <b>B · Phá tường</b>: tường bị ăn ⇡ → đi theo hướng phá. <b>C · Rút tường</b>: tường bị rút ✕ → đi theo hướng giá đang tới. <b>D · Sau thanh lý</b>: cụm thanh lý một phía đã dứt 30 giây → vào ngược lại.</details>
     </div>
@@ -277,12 +297,16 @@ function detectWalls(col,agg,mid){
       addEvent("wall",p,`Tường ${w.side==="bid"?"MUA":"BÁN"} ${fmtQ(cur)} ${coin()} (${fusd(cur*p)}) @ ${fp(p)}`,false); } }
     if(cur<w.peak*0.35){
       if(w.ann){ const drop=w.peak-cur, traded=tradedSince(k,w.since);
-        if(traded>=drop*0.5){ openSignal("B",w.side==="bid"?-1:1,p,"phá tường"); addEvent("brk",p,`Tường ${w.side==="bid"?"mua":"bán"} ${fmtQ(w.peak)} ${coin()} @ ${fp(p)} bị ăn hết (khớp ${fusd(traded*p)})`,true); }
-        else if(dist<=20){ openSignal("C",w.side==="bid"?-1:1,p,"rút tường"); addEvent("pull",p,`Rút tường ${w.side==="bid"?"mua":"bán"} ${fmtQ(w.peak)} ${coin()} (${fusd(w.peak*p)}) @ ${fp(p)} khi giá cách ${fp(dist*B)} (nghi lệnh giả)`,true); } }
+        const info={sz:w.peak*p,age:Math.round(age)};
+        if(traded>=drop*0.5){ const r=openSignal("B",w.side==="bid"?-1:1,p,"phá tường",2,info); addEvent("brk",p,`Tường ${w.side==="bid"?"mua":"bán"} ${fmtQ(w.peak)} ${coin()} (${fusd(w.peak*p)}, đứng ${Math.round(age)} s) @ ${fp(p)} bị ăn hết (khớp ${fusd(traded*p)})${r}`,true); }
+        else if(dist<=20){ const r=openSignal("C",w.side==="bid"?-1:1,p,"rút tường",2,info); addEvent("pull",p,`Rút tường ${w.side==="bid"?"mua":"bán"} ${fmtQ(w.peak)} ${coin()} (${fusd(w.peak*p)}, đứng ${Math.round(age)} s) @ ${fp(p)} khi giá cách ${fp(dist*B)} (nghi lệnh giả)${r}`,true); } }
       S.walls.delete(k); }
     else if(now-w.seen>40) S.walls.delete(k);
   }
 }
+// lượng lệnh chờ (USD) đang đứng quanh mức k (±1 ô) ở cột hiện tại, phía mua (dir>0) hoặc bán
+function restAt(col,k,dir){ let q=0; const mid=(col.bid+col.ask)/2;
+  for(let i=0;i<col.keys.length;i++){ const kk=col.keys[i]; if(Math.abs(kk-k)>1) continue; const p=(kk+0.5)*S.bucket; if(dir>0?p<=mid:p>=mid) q+=col.qs[i]*p; } return q; }
 function detectAbsorption(col){
   const B=S.bucket, win=Math.max(8,Math.round(20000/S.speed)); if(S.cols.length<win) return;
   const sums=new Map(); let lo=Infinity, hi=-Infinity, tot=0;
@@ -292,10 +316,10 @@ function detectAbsorption(col){
   for(const [k,x] of sums){ const kp=k*B;
     const last=S.absFired.get(k)||0; if(now-last<60000) continue;
     // bán chủ động dồn vào một mức, giá không thủng xuống dưới mức đó
-    if(x.s>=thr && lo>=kp-B && col.bid>=kp-B && col.bid<=kp+4*B){ S.absFired.set(k,now);
-      openSignal("A",1,kp,"hấp thụ bán"); addEvent("absb",kp+B/2,`Hấp thụ bán @ ${fp(kp)}: ${fusd(x.s*kp)} bán chủ động trong ${Math.round(win*S.speed/1000)} s nhưng giá giữ`,true); }
-    else if(x.b>=thr && hi<=kp+2*B && col.ask<=kp+2*B && col.ask>=kp-3*B){ S.absFired.set(k,now);
-      openSignal("A",-1,kp+B,"hấp thụ mua"); addEvent("abss",kp+B/2,`Hấp thụ mua @ ${fp(kp)}: ${fusd(x.b*kp)} mua chủ động trong ${Math.round(win*S.speed/1000)} s nhưng giá không vượt`,true); }
+    if(x.s>=thr && lo>=kp-B && col.bid>=kp-B && col.bid<=kp+4*B){ S.absFired.set(k,now); const rest=restAt(col,k,1);
+      const r=openSignal("A",1,kp,"hấp thụ bán",2,{sz:x.s*kp,rest}); addEvent("absb",kp+B/2,`Hấp thụ bán @ ${fp(kp)}: ${fusd(x.s*kp)} bán chủ động trong ${Math.round(win*S.speed/1000)} s nhưng giá giữ · tường mua đứng ${fusd(rest)}${r}`,true); }
+    else if(x.b>=thr && hi<=kp+2*B && col.ask<=kp+2*B && col.ask>=kp-3*B){ S.absFired.set(k,now); const rest=restAt(col,k,-1);
+      const r=openSignal("A",-1,kp+B,"hấp thụ mua",2,{sz:x.b*kp,rest}); addEvent("abss",kp+B/2,`Hấp thụ mua @ ${fp(kp)}: ${fusd(x.b*kp)} mua chủ động trong ${Math.round(win*S.speed/1000)} s nhưng giá không vượt · tường bán đứng ${fusd(rest)}${r}`,true); }
   }
 }
 function onLiq(price,qty,sideSell,t){
@@ -360,21 +384,33 @@ function features(dir){
   const imb=(bq-aq)/((bq+aq)||1), uh=new Date().getUTCHours();
   return {trend:dir*tr>0, cvd:dir*cvd>0, book:dir*imb>0.1, vol, sess:uh>=7&&uh<21};
 }
+const RULE_DEF={onA:true,onB:true,onC:true,onD:true,absMin:0,restMin:0,brkMin:0,brkAge:15,pullMin:0,pullAge:15,liqMinD:500000};
+let RULE={...RULE_DEF}; try{ Object.assign(RULE,JSON.parse(localStorage.getItem("bm_rules")||"{}")||{}); }catch(e){}
+// trả về lý do không vào lệnh, hoặc "" nếu đạt
+function ruleFail(setup,info){
+  if(!RULE["on"+setup]) return "đang tắt setup "+setup;
+  if(setup==="A"){ if(RULE.absMin&&info.sz<RULE.absMin) return "hấp thụ nhỏ"; if(RULE.restMin&&(info.rest||0)<RULE.restMin) return "không có tường đứng"; }
+  if(setup==="B"){ if(RULE.brkMin&&info.sz<RULE.brkMin) return "tường nhỏ"; if((info.age||0)<RULE.brkAge) return "tường mới đứng"; }
+  if(setup==="C"){ if(RULE.pullMin&&info.sz<RULE.pullMin) return "tường nhỏ"; if((info.age||0)<RULE.pullAge) return "tường mới đứng"; }
+  if(setup==="D"){ if(info.sz<RULE.liqMinD) return "cụm thanh lý nhỏ"; }
+  return ""; }
 let ACT={}; try{ ACT=JSON.parse(localStorage.getItem("bm_filt")||"{}")||{}; }catch(e){}
 const passF=o=>{ const ks=Object.keys(ACT).filter(k=>ACT[k]); if(!ks.length) return true; return !!o.f&&ks.every(k=>o.f[k]); };
-function openSignal(setup,dir,ref,why,rr=2){
-  if(!S.auto||S.bestBid==null||!S.bucket) return;
+function openSignal(setup,dir,ref,why,rr=2,info={}){
+  if(!S.auto||S.bestBid==null||!S.bucket) return "";
+  const bad=ruleFail(setup,info); if(bad) return " · không vào lệnh: "+bad;
   const sym=S.mkt==="demo"?"DEMO":S.sym;
-  if(S.sigOpen.some(o=>o.setup===setup&&o.sym===sym)) return;
+  if(S.sigOpen.some(o=>o.setup===setup&&o.sym===sym)) return " · không vào lệnh: setup đang có lệnh mở";
   const B=S.bucket, px=dir>0?S.bestAsk:S.bestBid;
   const minRisk=Math.max(4*B, 0.5*recentRange(60), px*S.fee*3);
   let sl=dir>0?Math.min(ref-2*B,px-minRisk):Math.max(ref+2*B,px+minRisk);
-  const risk=Math.abs(px-sl); if(risk>px*0.012) return;           // SL quá xa thì bỏ
+  const risk=Math.abs(px-sl); if(risk>px*0.012) return " · không vào lệnh: SL quá xa";           // SL quá xa thì bỏ
   const tp=px+dir*rr*risk;
-  const o={id:Date.now()+Math.random(),t:Date.now(),chk:Date.now(),mkt:S.mkt,sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open",f:features(dir)};
+  const o={id:Date.now()+Math.random(),t:Date.now(),chk:Date.now(),mkt:S.mkt,sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open",f:features(dir),sz:info.sz||0,rest:info.rest,age:info.age};
   S.sigOpen.push(o); saveSigs();
   addEvent("sig",px,`Lệnh giấy ${SETUP[setup]}: ${dir>0?"MUA":"BÁN"} @ ${fp(px)} · SL ${fp(sl)} · TP ${fp(tp)}`,true);
   renderStats();
+  return "";
 }
 function closeSignal(o,exit,how){
   o.exit=exit; o.tx=Date.now(); o.how=how; o.status="closed";
@@ -394,9 +430,10 @@ function detectCascade(){
   const now=Date.now(); S.liqWin=S.liqWin.filter(x=>now-x.t<120000);
   for(const side of ["L","S"]){ const xs=S.liqWin.filter(x=>x.long===(side==="L")); if(!xs.length) continue;
     const first=xs[0].t, last=xs[xs.length-1].t, usd=xs.reduce((a,x)=>a+x.usd,0);
-    if(usd>=S.liqMin*10 && now-last>=30000 && S.cascUsed[side]!==first){ S.cascUsed[side]=first;
+    if(usd>=Math.min(S.liqMin*10,RULE.liqMinD) && now-last>=30000 && S.cascUsed[side]!==first){ S.cascUsed[side]=first;
       const ext=side==="L"?Math.min(...xs.map(x=>x.p)):Math.max(...xs.map(x=>x.p));
-      openSignal("D",side==="L"?1:-1,ext,`thanh lý ${side==="L"?"LONG":"SHORT"} ${fusd(usd)}`,1.5); } }
+      const r=openSignal("D",side==="L"?1:-1,ext,`thanh lý ${side==="L"?"LONG":"SHORT"} ${fusd(usd)}`,1.5,{sz:usd});
+      if(usd>=S.liqMin*10) addEvent(side==="L"?"liql":"liqs",ext,`Cụm thanh lý ${side==="L"?"LONG":"SHORT"} ${fusd(usd)} đã dứt 30 s${r||" → lệnh giấy D"}`,false); } }
 }
 const SD=()=>S.statWin&&!S.statWin.closed?S.statWin.document:document;
 function openStatsWindow(){
@@ -453,7 +490,14 @@ function renderStats(){
   let fh='<div class="h">Lọc</div><div class="h">Điều kiện</div><div class="h r">Đạt: lệnh·thắng·R</div><div class="h r">Không đạt</div>';
   for(const [k,name,,tip] of FILT) fh+=`<label title="${tip}"><input type="checkbox" data-k="${k}" ${ACT[k]?"checked":""}><span class="nm">${name}</span><span class="r">${cell(fx.filter(o=>o.f[k]))}</span><span class="r">${cell(fx.filter(o=>!o.f[k]))}</span></label>`;
   fh+=`<div class="ft">${fx.length} lệnh có ghi điều kiện. Điều kiện nào mà cột <b>Đạt</b> có R/lệnh cao hơn rõ rệt cột <b>Không đạt</b> (mỗi bên ≥ 30 lệnh) thì mới nên dùng. Tick ô <b>Lọc</b> để các ô số liệu và danh sách chỉ tính lệnh đạt điều kiện${nAct?` — <span class="fbadge">đang lọc ${nAct} điều kiện: ${rows.length}/${base.length} lệnh</span>`:""}.</div>`;
-  const FL=D.getElementById("stflt"); FL.innerHTML=fh;
+  // theo độ lớn (USD) của tường / hấp thụ / cụm thanh lý lúc vào lệnh
+  const BK=[[0,5e5,"< 500k"],[5e5,1e6,"500k – 1 tr"],[1e6,3e6,"1 – 3 tr"],[3e6,1e7,"3 – 10 tr"],[1e7,1e15,"≥ 10 tr"]];
+  const zx=base.filter(o=>o.sz&&(!fs||o.setup===fs));
+  let zh=`<div class="sz"><div class="h">${fs==="A"?"Hấp thụ":fs==="D"?"Cụm thanh lý":fs?"Tường":"Độ lớn"} (USD)</div><div class="h r">Lệnh</div><div class="h r">Thắng</div><div class="h r">R/lệnh</div>`;
+  for(const [a,b,lab] of BK){ const x=st(zx.filter(o=>o.sz>=a&&o.sz<b)); zh+=`<div>${lab}</div><div class="r">${x.n||'<span class="mut">0</span>'}</div><div class="r">${x.n?Math.round(x.wr*100)+"%":'<span class="mut">–</span>'}</div><div class="r ${x.n?cls(x.avg):""}">${x.n?sgn(x.avg):'<span class="mut">–</span>'}</div>`; }
+  zh+=`</div>`;
+  fh+=`<div class="ft" style="margin-top:8px;color:var(--fg)">Theo độ lớn lúc vào lệnh${fs?"":" (chọn từng setup ở ô trên để xem riêng)"}</div>`;
+  const FL=D.getElementById("stflt"); FL.innerHTML=fh+zh;
   FL.querySelectorAll("input").forEach(cb=>cb.onchange=()=>{ ACT[cb.dataset.k]=cb.checked; try{localStorage.setItem("bm_filt",JSON.stringify(ACT));}catch(e){} renderStats(); });
   // lệnh đang mở
   D.getElementById("stopenh").innerHTML=`<span>Đang mở (${opens.length})</span>${opens.length?`<span class="${cls(plR)}">${sgn(plR)}R</span>`:""}`;
@@ -837,14 +881,17 @@ $("statbtn").onclick=()=>{ if(S.statWin&&!S.statWin.closed){ S.statWin.focus(); 
 $("stpop").onclick=()=>{ if(!openStatsWindow()) toast("Trình duyệt đang chặn cửa sổ bật lên. Cho phép ở thanh địa chỉ rồi bấm lại."); };
 
 $("stfset").onchange=()=>renderStats();
+document.querySelectorAll("#strules [data-r]").forEach(el=>{ const k=el.dataset.r;
+  if(el.type==="checkbox") el.checked=!!RULE[k]; else el.value=String(RULE[k]);
+  el.onchange=()=>{ RULE[k]=el.type==="checkbox"?el.checked:+el.value; try{localStorage.setItem("bm_rules",JSON.stringify(RULE));}catch(e){} toast("Đã lưu điều kiện vào lệnh — áp dụng cho lệnh mới"); }; });
 $("stcfg").onclick=()=>{ const D=SD(), c=D.getElementById("stcfgp"); c.hidden=!c.hidden; D.getElementById("stcfg").classList.toggle("on",!c.hidden); };
 $("stx").onclick=()=>{ if(S.statWin&&!S.statWin.closed){ S.statWin.close(); return; } document.getElementById("st2").hidden=true; $("statbtn").classList.remove("on"); };
 $("stsym").onchange=()=>{ renderStats(); toast(document.getElementById("stsym").value==="all"?"Đang xem tất cả các mã":"Đang xem mã hiện tại"); };
 $("fee").onchange=e=>{S.fee=+e.target.value; toast("Phí mới áp dụng cho các lệnh giấy mở từ bây giờ");};
 $("clr").onclick=e=>{ const btn=e.currentTarget; if(btn.dataset.c!=="1"){ btn.dataset.c="1"; btn.textContent="Bấm lần nữa để xóa"; toast("Bấm \"Bấm lần nữa để xóa\" trong 4 giây để xóa hết lệnh giấy"); setTimeout(()=>{btn.dataset.c="";btn.textContent="Xóa dữ liệu";},4000); return; }
   const n=S.sigClosed.length; S.sigClosed=[]; S.sigOpen=[]; saveSigs(); btn.dataset.c=""; btn.textContent="Xóa dữ liệu"; renderStats(); toast(`Đã xóa ${n} lệnh giấy`); };
-$("csv").onclick=()=>{ if(!S.sigClosed.length){ toast("Chưa có lệnh giấy nào đã đóng để xuất"); return; } const head=["gio_vao","gio_ra","ma","setup","huong","vao","sl","tp","thoat","cach_dong","R","ly_do",...FILT.map(f=>"dk_"+f[0])];
-  const rows=S.sigClosed.map(o=>[new Date(o.t).toISOString(),new Date(o.tx).toISOString(),o.sym,SETUP[o.setup],o.dir>0?"Mua":"Ban",o.entry,o.sl,o.tp,o.exit,o.how,o.R,o.why,...FILT.map(f=>o.f?(o.f[f[0]]?1:0):"")]);
+$("csv").onclick=()=>{ if(!S.sigClosed.length){ toast("Chưa có lệnh giấy nào đã đóng để xuất"); return; } const head=["gio_vao","gio_ra","ma","setup","huong","vao","sl","tp","thoat","cach_dong","R","ly_do","do_lon_usd","tuong_dung_usd","tuong_dung_giay",...FILT.map(f=>"dk_"+f[0])];
+  const rows=S.sigClosed.map(o=>[new Date(o.t).toISOString(),new Date(o.tx).toISOString(),o.sym,SETUP[o.setup],o.dir>0?"Mua":"Ban",o.entry,o.sl,o.tp,o.exit,o.how,o.R,o.why,o.sz||"",o.rest??"",o.age??"",...FILT.map(f=>o.f?(o.f[f[0]]?1:0):"")]);
   const csv=[head,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv"})); a.download="lenh_giay_bookmap.csv"; document.body.appendChild(a); a.click(); a.remove(); toast(`Đã tải lenh_giay_bookmap.csv (${S.sigClosed.length} lệnh)`); };
 $("hb").onclick=()=>{$("help").hidden=!$("help").hidden;};
