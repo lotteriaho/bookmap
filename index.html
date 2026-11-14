@@ -148,7 +148,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
       <button id="stcfg" class="ib" title="Phí, xuất CSV, xóa dữ liệu">⚙</button><button id="stpop" class="ib" title="Mở ra cửa sổ riêng">⧉</button><button id="stx" class="ib" title="Ẩn bảng">✕</button></header>
     <div class="cfg" id="stcfgp" hidden>
       <label>Phí + trượt <select id="fee"><option value="0.0003">0,03%</option><option value="0.0005" selected>0,05%</option><option value="0.0008">0,08%</option><option value="0.0012">0,12%</option></select></label>
-      <button id="csv">Xuất CSV</button><button id="clr">Xóa dữ liệu</button>
+      <button id="csv" title="Toàn bộ lịch sử lệnh: điều kiện lúc vào, độ lớn tường, MFE/MAE">Xuất CSV (toàn bộ)</button><button id="clr">Xóa dữ liệu</button>
       <div class="rules" id="strules">
         <div class="rh">Điều kiện vào lệnh <span class="mut">(lệnh không đạt vẫn hiện ở Sự kiện, chỉ không tạo lệnh giấy)</span></div>
         <label><input type="checkbox" data-r="onA" checked><b>A · Bật tường</b></label>
@@ -390,7 +390,8 @@ async function resolveOpen(all){
     for(const o of g.list){ if(o.status!=="open"||!S.sigOpen.includes(o)) continue;
       const from=Math.max(o.t,o.chk||o.t), exp=o.t+1800000; let closed=false;
       for(const k of K){ const t0=+k[0]; if(t0+60000<=from) continue;
-        const hi=+k[2], lo=+k[3], cl=+k[4];
+        const hi=+k[2], lo=+k[3], cl=+k[4], tk=Math.max(o.t,t0+30000);
+        trackEx(o,o.dir>0?(hi-o.entry)/o.risk:(o.entry-lo)/o.risk,tk); trackEx(o,o.dir>0?(lo-o.entry)/o.risk:(o.entry-hi)/o.risk,tk);
         const sl=o.dir>0?lo<=o.sl:hi>=o.sl, tp=o.dir>0?hi>=o.tp:lo<=o.tp;
         if(sl){ closeSignal(o,o.sl,"chạm SL (nến 1m)"); closed=true; break; }   // cùng nến chạm cả 2 -> tính SL cho chắc
         if(tp){ closeSignal(o,o.tp,"chạm TP (nến 1m)"); closed=true; break; }
@@ -412,7 +413,11 @@ function features(dir){
   const span=Math.max(60,(last.t-first.t)/1000), vol=span>=180&&v60>1.5*vAll*60/span;
   let bq=0,aq=0; const w=m0*0.0015; for(const [p,q] of S.book.bids) if(p>=m0-w) bq+=q; for(const [p,q] of S.book.asks) if(p<=m0+w) aq+=q;
   const imb=(bq-aq)/((bq+aq)||1), uh=new Date().getUTCHours();
-  return {trend:dir*tr>0, cvd:dir*cvd>0, book:dir*imb>0.1, vol, sess:uh>=7&&uh<21};
+  const volX=vAll>0?v60/(vAll*60/span):0;
+  // b: đạt/không đạt; raw: giá trị gốc (dương = thuận hướng lệnh) để sau này backtest chọn ngưỡng khác
+  return {b:{trend:dir*tr>0, cvd:dir*cvd>0, book:dir*imb>0.1, vol, sess:uh>=7&&uh<21},
+    raw:{xh10_pct:+(dir*tr/m0*100).toFixed(3), cvd60_usd:Math.round(dir*cvd*m0), so_lech:+(dir*imb).toFixed(3), kl_x:+volX.toFixed(2), gio_utc:uh,
+         spread_bps:+((last.ask-last.bid)/m0*1e4).toFixed(2), bien_dong5_pct:+(recentRange(300)/m0*100).toFixed(3)}};
 }
 const RULE_DEF={onA:true,onB:true,onC:true,onD:true,absMin:0,restMin:0,brkMin:0,brkAge:15,pullMin:0,pullAge:15,liqMinD:500000};
 let RULE={...RULE_DEF}; try{ Object.assign(RULE,JSON.parse(localStorage.getItem("bm_rules")||"{}")||{}); }catch(e){}
@@ -436,7 +441,7 @@ function openSignal(setup,dir,ref,why,rr=2,info={}){
   let sl=dir>0?Math.min(ref-2*B,px-minRisk):Math.max(ref+2*B,px+minRisk);
   const risk=Math.abs(px-sl); if(risk>px*0.012) return " · không vào lệnh: SL quá xa";           // SL quá xa thì bỏ
   const tp=px+dir*rr*risk;
-  const o={id:Date.now()+Math.random(),t:Date.now(),chk:Date.now(),mkt:S.mkt,sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open",f:features(dir),sz:info.sz||0,rest:info.rest,age:info.age};
+  const o={id:Date.now()+Math.random(),t:Date.now(),chk:Date.now(),mkt:S.mkt,sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open",...(F=>F?{f:F.b,raw:F.raw}:{})(features(dir)),sz:info.sz||0,rest:info.rest,age:info.age};
   S.sigOpen.push(o); saveSigs();
   addEvent("sig",px,`Lệnh giấy ${SETUP[setup]}: ${dir>0?"MUA":"BÁN"} @ ${fp(px)} · SL ${fp(sl)} · TP ${fp(tp)}`,true);
   renderStats();
@@ -445,14 +450,18 @@ function openSignal(setup,dir,ref,why,rr=2,info={}){
 function closeSignal(o,exit,how){
   o.exit=exit; o.tx=Date.now(); o.how=how; o.status="closed";
   o.R=+((o.dir*(exit-o.entry)-o.fee*o.entry)/o.risk).toFixed(3);
-  S.sigOpen=S.sigOpen.filter(x=>x!==o); S.sigClosed.push(o); saveSigs();
+  trackEx(o,o.dir*(exit-o.entry)/o.risk,o.tx);
+  S.sigOpen=S.sigOpen.filter(x=>x!==o); S.sigClosed.push(o); saveSigs(); archiveTrade(o);
   if(o.sym===(S.mkt==="demo"?"DEMO":S.sym)) addEvent(o.R>0?"win":"loss",exit,`Lệnh giấy ${SETUP[o.setup]} ${o.dir>0?"MUA":"BÁN"} đóng ${how} @ ${fp(exit)} · ${o.R>0?"+":""}${o.R.toFixed(2)}R`,false);
   renderStats();
 }
+// MFE / MAE: lệnh đã đi có lợi nhất / bất lợi nhất bao nhiêu R (để sau này thử TP, SL, thời gian giữ khác)
+function trackEx(o,ex,now){ if(o.mfe==null||ex>o.mfe){ o.mfe=+ex.toFixed(3); o.tmfe=Math.round((now-o.t)/1000); } if(o.mae==null||ex<o.mae){ o.mae=+ex.toFixed(3); o.tmae=Math.round((now-o.t)/1000); } }
 function checkSignals(bid,ask){
   if(!S.sigOpen.length) return; const now=Date.now(), sym=S.mkt==="demo"?"DEMO":S.sym;
   for(const o of [...S.sigOpen]){ if(o.sym!==sym||(o.mkt||"fut")!==S.mkt&&sym!=="DEMO") continue;
     if(sym!=="DEMO"&&now-(o.chk||o.t)>30000) continue;   // đang chờ chấm bằng nến 1m cho đoạn bị đóng trang
+    trackEx(o,o.dir*((o.dir>0?bid:ask)-o.entry)/o.risk,now);
     if(o.dir>0){ if(bid<=o.sl) closeSignal(o,o.sl,"chạm SL"); else if(bid>=o.tp) closeSignal(o,o.tp,"chạm TP"); else if(now-o.t>1800000) closeSignal(o,bid,"hết 30 phút"); }
     else { if(ask>=o.sl) closeSignal(o,o.sl,"chạm SL"); else if(ask<=o.tp) closeSignal(o,o.tp,"chạm TP"); else if(now-o.t>1800000) closeSignal(o,ask,"hết 30 phút"); } }
 }
@@ -799,12 +808,25 @@ function applyDepth(kind,d,gen){
 // ---------- lưu lịch sử vào trình duyệt (IndexedDB) để F5 không mất ----------
 const HIST={db:null,key:null,lastN:-1,busy:false};
 const histKey=kind=>[kind,S.sym,S.bmul,S.speed].join(":");
-function idb(){ if(HIST.db) return Promise.resolve(HIST.db);
-  return new Promise((res,rej)=>{ let r; try{ r=indexedDB.open("bm_hist",1); }catch(e){ return rej(e); }
-    r.onupgradeneeded=()=>{ const d=r.result; d.createObjectStore("chunks",{keyPath:["k","n"]}); d.createObjectStore("meta",{keyPath:"k"}); };
-    r.onsuccess=()=>{ HIST.db=r.result; res(r.result); }; r.onerror=()=>rej(r.error); }); }
+function idb(){ if(HIST.db) return Promise.resolve(HIST.db); if(HIST.dbp) return HIST.dbp;
+  HIST.dbp=new Promise((res,rej)=>{ let r, done=false; const fail=e=>{ if(done) return; done=true; HIST.dbp=null; rej(e); };
+    setTimeout(()=>fail(new Error("idb timeout")),4000);   // tab cũ đang giữ phiên bản cũ -> không treo trang
+    try{ r=indexedDB.open("bm_hist",2); }catch(e){ return fail(e); }
+    r.onupgradeneeded=()=>{ const d=r.result, has=n=>d.objectStoreNames.contains(n);
+      if(!has("chunks")) d.createObjectStore("chunks",{keyPath:["k","n"]}); if(!has("meta")) d.createObjectStore("meta",{keyPath:"k"}); if(!has("trades")) d.createObjectStore("trades",{keyPath:"id"}); };
+    r.onsuccess=()=>{ const d=r.result; d.onversionchange=()=>{ d.close(); HIST.db=null; }; if(done){ HIST.db=d; return; } done=true; HIST.db=d; res(d); };
+    r.onerror=()=>fail(r.error); r.onblocked=()=>{}; });
+  return HIST.dbp; }
 const reqP=r=>new Promise((res,rej)=>{ r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
 const rangeK=(k,lo,hi)=>IDBKeyRange.bound([k,lo],[k,hi]);
+// kho lưu toàn bộ lịch sử lệnh giấy (không giới hạn 3000 như bộ nhớ nhanh), dùng cho xuất CSV / backtest
+async function archiveTrade(o){ try{ const db=await idb(); db.transaction("trades","readwrite").objectStore("trades").put(JSON.parse(JSON.stringify(o))); }catch(e){} }
+async function allTrades(){ const m=new Map();
+  try{ const db=await idb(); for(const o of await reqP(db.transaction("trades","readonly").objectStore("trades").getAll())) m.set(o.id,o); }catch(e){}
+  let ct=0; try{ ct=+(localStorage.getItem("bm_clearT")||0); }catch(e){}
+  for(const o of S.sigClosed) if(!m.has(o.id)) m.set(o.id,o);
+  return [...m.values()].filter(o=>(o.t||0)>=ct).sort((a,b)=>(a.tx||a.t)-(b.tx||b.t)); }
+async function clearArchive(){ try{ const db=await idb(); db.transaction("trades","readwrite").objectStore("trades").clear(); }catch(e){} }
 async function saveHist(){
   const k=HIST.key; if(!k||HIST.busy||!S.bucket||!S.cols.length) return;
   HIST.busy=true;
@@ -939,11 +961,13 @@ $("stx").onclick=()=>{ if(S.statWin&&!S.statWin.closed){ S.statWin.close(); retu
 $("stsym").onchange=()=>{ renderStats(); toast(document.getElementById("stsym").value==="all"?"Đang xem tất cả các mã":"Đang xem mã hiện tại"); };
 $("fee").onchange=e=>{S.fee=+e.target.value; toast("Phí mới áp dụng cho các lệnh giấy mở từ bây giờ");};
 $("clr").onclick=e=>{ const btn=e.currentTarget; if(btn.dataset.c!=="1"){ btn.dataset.c="1"; btn.textContent="Bấm lần nữa để xóa"; toast("Bấm \"Bấm lần nữa để xóa\" trong 4 giây để xóa hết lệnh giấy"); setTimeout(()=>{btn.dataset.c="";btn.textContent="Xóa dữ liệu";},4000); return; }
-  const n=S.sigClosed.length; try{ localStorage.setItem("bm_clearT",String(Date.now()+1)); localStorage.setItem("bm_sigs","[]"); localStorage.setItem("bm_sigopen","[]"); }catch(e){} S.sigClosed=[]; S.sigOpen=[]; saveSigs(); btn.dataset.c=""; btn.textContent="Xóa dữ liệu"; renderStats(); toast(`Đã xóa ${n} lệnh giấy`); };
-$("csv").onclick=()=>{ if(!S.sigClosed.length){ toast("Chưa có lệnh giấy nào đã đóng để xuất"); return; } const head=["gio_vao","gio_ra","ma","setup","huong","vao","sl","tp","thoat","cach_dong","R","ly_do","do_lon_usd","tuong_dung_usd","tuong_dung_giay",...FILT.map(f=>"dk_"+f[0])];
-  const rows=S.sigClosed.map(o=>[new Date(o.t).toISOString(),new Date(o.tx).toISOString(),o.sym,SETUP[o.setup],o.dir>0?"Mua":"Ban",o.entry,o.sl,o.tp,o.exit,o.how,o.R,o.why,o.sz||"",o.rest??"",o.age??"",...FILT.map(f=>o.f?(o.f[f[0]]?1:0):"")]);
+  const n=S.sigClosed.length; try{ localStorage.setItem("bm_clearT",String(Date.now()+1)); localStorage.setItem("bm_sigs","[]"); localStorage.setItem("bm_sigopen","[]"); }catch(e){} clearArchive(); S.sigClosed=[]; S.sigOpen=[]; saveSigs(); btn.dataset.c=""; btn.textContent="Xóa dữ liệu"; renderStats(); toast(`Đã xóa ${n} lệnh giấy`); };
+$("csv").onclick=async()=>{ const all=await allTrades(); if(!all.length){ toast("Chưa có lệnh giấy nào đã đóng để xuất"); return; }
+  const RAW=["xh10_pct","cvd60_usd","so_lech","kl_x","gio_utc","spread_bps","bien_dong5_pct"];
+  const head=["id","gio_vao","gio_ra","giu_giay","san","ma","setup","huong","vao","sl","tp","rui_ro","thoat","cach_dong","R","phi","ly_do","do_lon_usd","tuong_dung_usd","tuong_dung_giay","mfe_R","giay_toi_mfe","mae_R","giay_toi_mae",...FILT.map(f=>"dk_"+f[0]),...RAW];
+  const rows=all.map(o=>[o.id,new Date(o.t).toISOString(),new Date(o.tx).toISOString(),Math.round((o.tx-o.t)/1000),o.mkt||"fut",o.sym,o.setup,o.dir>0?"Mua":"Ban",o.entry,o.sl,o.tp,o.risk,o.exit,o.how,o.R,o.fee,o.why,o.sz||"",o.rest??"",o.age??"",o.mfe??"",o.tmfe??"",o.mae??"",o.tmae??"",...FILT.map(f=>o.f?(o.f[f[0]]?1:0):""),...RAW.map(k=>o.raw?(o.raw[k]??""):"")]);
   const csv=[head,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
-  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv"})); a.download="lenh_giay_bookmap.csv"; document.body.appendChild(a); a.click(); a.remove(); toast(`Đã tải lenh_giay_bookmap.csv (${S.sigClosed.length} lệnh)`); };
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["﻿"+csv],{type:"text/csv"})); a.download=`lenh_giay_bookmap_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); a.remove(); toast(`Đã tải file CSV: ${all.length} lệnh, đủ điều kiện + MFE/MAE`); };
 $("hb").onclick=()=>{$("help").hidden=!$("help").hidden;};
 $("evmin").onclick=e=>{const m=$("ev").classList.toggle("min"); e.target.textContent=m?"Mở":"Thu gọn";};
 $("wallmin").onchange=e=>{S.wallMin=+e.target.value; S.walls.clear();};
@@ -959,7 +983,7 @@ ov.addEventListener("pointermove",e=>{ if(!drag||S.center==null) return; const d
 ov.addEventListener("pointerup",()=>{drag=null;});
 
 // ---------- boot ----------
-resize(); loadSigs(); setTimeout(()=>resolveOpen(true),1500); startClock(); requestAnimationFrame(frame); let lastRS=0; setInterval(()=>{ const n=Date.now(); if(S.sigOpen.length||n-lastRS>5000){ lastRS=n; renderStats(); } },1000);
+resize(); loadSigs(); setTimeout(()=>{ for(const o of S.sigClosed) archiveTrade(o); },3000); setTimeout(()=>resolveOpen(true),1500); startClock(); requestAnimationFrame(frame); let lastRS=0; setInterval(()=>{ const n=Date.now(); if(S.sigOpen.length||n-lastRS>5000){ lastRS=n; renderStats(); } },1000);
 const q=new URLSearchParams(location.search);
 const EMBED=q.get("embed")==="1", CELL=+(q.get("cell")||0);
 const toParent=m=>{ if(EMBED&&window.parent!==window) try{ window.parent.postMessage({bm:1,cell:CELL,...m},"*"); }catch(e){} };
