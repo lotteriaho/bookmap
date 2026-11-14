@@ -969,9 +969,9 @@ function tgNotify(key,text){ if(!SYNC.url||!RULE.tgA) return;
     .then(r=>r.json()).then(j=>{ if(!j.ok&&j.tg) synStatus("Telegram: "+j.tg,"neg"); }).catch(()=>{}); }
 const fpx=(v,ref)=>{ const d=ref>=1000?1:ref>=10?2:ref>=1?3:6; return (+v).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d}); };
 function tgOpen(o){ if(!isH1(o)) return; const c=o.sym.replace(/USDT$/,"");
-  tgNotify(o.id+":o",`🟦 <b>Kèo A chuẩn · ${o.dir>0?"MUA":"BÁN"} ${c}</b> (lệnh giấy)\nVào ${fpx(o.entry,o.entry)} · SL ${fpx(o.sl,o.entry)} · TP ${fpx(o.tp,o.entry)}\n${o.why}${o.sz?` ${(o.sz/1e6).toFixed(1)} tr USD`:""} · sổ nghiêng cùng chiều · ngược xu hướng\n⏱ tối đa 30 phút`); }
-function tgClose(o){ if(!isH1(o)) return; const c=o.sym.replace(/USDT$/,""), all=S.sigClosed.filter(isH1).filter(x=>x.t>=H1T), w=all.filter(x=>x.R>0).length, tot=all.reduce((a,x)=>a+x.R,0);
-  tgNotify(o.id+":c",`${o.R>0?"✅":"❌"} <b>Kèo A chuẩn · ${o.dir>0?"MUA":"BÁN"} ${c}</b> đóng ${o.how}\n${fpx(o.entry,o.entry)} → ${fpx(o.exit,o.entry)} · <b>${o.R>0?"+":""}${o.R.toFixed(2)}R</b>\nTừ lúc theo dõi: ${all.length} lệnh · thắng ${all.length?Math.round(w/all.length*100):0}% · ${tot>=0?"+":""}${tot.toFixed(1)}R`); }
+  tgNotify(o.id+":o",`${o.dir>0?"🟢 <b>MUA":"🔴 <b>BÁN"} ${c}</b>\nVào: ${fpx(o.entry,o.entry)}\nSL: ${fpx(o.sl,o.entry)}\nTP: ${fpx(o.tp,o.entry)}`); }
+function tgClose(o){ if(!isH1(o)) return; const c=o.sym.replace(/USDT$/,""), h=/TP/.test(o.how)?"chạm TP":/SL/.test(o.how)?"chạm SL":"hết 30 phút";
+  tgNotify(o.id+":c",`${o.R>0?"✅":"❌"} ${o.dir>0?"MUA":"BÁN"} ${c} — ${h} (${o.R>0?"+":""}${o.R.toFixed(2)}R)`); }
 function parseCSV(t){ const rows=[]; let row=[], f="", q=false;
   for(let i=0;i<t.length;i++){ const c=t[i];
     if(q){ if(c==='"'){ if(t[i+1]==='"'){ f+='"'; i++; } else q=false; } else f+=c; }
