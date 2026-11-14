@@ -339,7 +339,7 @@ function renderStats(){
 // ---------- heatmap drawing (incremental) ----------
 function drawColumnAt(col,x){
   const B=S.bucket, rp=S.rowPx;
-  hctx.fillStyle="#0b0f16"; hctx.fillRect(x,0,cw,mainH);
+  hctx.fillStyle=col.gap?"#141a26":"#0b0f16"; hctx.fillRect(x,0,cw,mainH);
   for(let i=0;i<col.keys.length;i++){
     const c=colorOf(col.qs[i]); if(!c) continue;
     const y=yOf((col.keys[i]+1)*B); if(y>mainH||y+rp<0) continue;
@@ -495,8 +495,12 @@ async function fetchSnapshot(list){
   for(const u of list){ try{ const r=await fetch(u,{cache:"no-store"}); if(r.ok) return await r.json(); }catch(e){} }
   throw new Error("snapshot");
 }
-function connect(kind,wsIdx=0){
-  stopAll(); resetData(); const gen=S.gen, ep=EPS(kind); $("sym").textContent=ep.name;
+async function connect(kind,wsIdx=0){
+  stopAll(); const gen=S.gen, ep=EPS(kind);
+  await saveHist(); if(gen!==S.gen) return;
+  resetData(); $("sym").textContent=ep.name;
+  status("Đang tải lịch sử…","wait");
+  await restoreHist(kind,gen); if(gen!==S.gen) return;
   status("Đang kết nối Binance…","wait");
   const urls=ep.ws[wsIdx]; S.socks=[]; let opened=0, gotData=false, started=false;
   const onmsg=ev=>{ if(gen!==S.gen) return; gotData=true; const m=JSON.parse(ev.data), d=m.data||m;
@@ -546,9 +550,80 @@ function applyDepth(kind,d,gen){
   applyLevels(S.book.bids,d.b); applyLevels(S.book.asks,d.a); S.prevU=d.u;
 }
 
+// ---------- lưu lịch sử vào trình duyệt (IndexedDB) để F5 không mất ----------
+const HIST={db:null,key:null,lastN:-1,busy:false};
+const histKey=kind=>[kind,S.sym,S.bmul,S.speed].join(":");
+function idb(){ if(HIST.db) return Promise.resolve(HIST.db);
+  return new Promise((res,rej)=>{ let r; try{ r=indexedDB.open("bm_hist",1); }catch(e){ return rej(e); }
+    r.onupgradeneeded=()=>{ const d=r.result; d.createObjectStore("chunks",{keyPath:["k","n"]}); d.createObjectStore("meta",{keyPath:"k"}); };
+    r.onsuccess=()=>{ HIST.db=r.result; res(r.result); }; r.onerror=()=>rej(r.error); }); }
+const reqP=r=>new Promise((res,rej)=>{ r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
+const rangeK=(k,lo,hi)=>IDBKeyRange.bound([k,lo],[k,hi]);
+async function saveHist(){
+  const k=HIST.key; if(!k||HIST.busy||!S.bucket||!S.cols.length) return;
+  HIST.busy=true;
+  try{ const db=await idb(), fresh=S.cols.filter(c=>c.n>HIST.lastN);
+    const tx=db.transaction(["chunks","meta"],"readwrite"), ch=tx.objectStore("chunks");
+    if(fresh.length) ch.put({k,n:fresh[0].n,cols:fresh});
+    tx.objectStore("meta").put({k,t:Date.now(),bucket:S.bucket,tick:S.tick,cvd:S.cvd,qScale:S.qScale,profile:S.profile,events:S.events.slice(0,60),marks:S.marks});
+    const minN=S.cols[0].n-1; if(minN>0) ch.delete(IDBKeyRange.bound([k,-1e15],[k,minN-200],false,true)); // xoá chunk quá cũ
+    await new Promise((res,rej)=>{ tx.oncomplete=res; tx.onerror=()=>rej(tx.error); tx.onabort=()=>rej(tx.error); });
+    if(fresh.length) HIST.lastN=fresh[fresh.length-1].n;
+  }catch(e){}
+  HIST.busy=false;
+}
+async function restoreHist(kind,gen){
+  const k=histKey(kind), now=Date.now(), keep=S.maxCols*S.speed; HIST.key=k; HIST.lastN=-1;
+  let meta=null, chunks=[];
+  try{ const db=await idb(), tx=db.transaction(["chunks","meta"],"readonly");
+    [meta,chunks]=await Promise.all([reqP(tx.objectStore("meta").get(k)),reqP(tx.objectStore("chunks").getAll(rangeK(k,-1e15,1e15)))]);
+  }catch(e){}
+  if(gen!==S.gen) return;
+  let cols=[];
+  if(meta&&now-meta.t<keep){ for(const c of chunks) for(const col of c.cols) if(col.t>now-keep) cols.push(col); cols.sort((a,b)=>a.n-b.n);
+    const seen=new Set(); cols=cols.filter(c=>!seen.has(c.n)&&seen.add(c.n)); }
+  let restored=0;
+  if(cols.length){ const L=cols[cols.length-1];
+    S.bucket=meta.bucket; S.tick=meta.tick; S.qScale=meta.qScale||S.qScale; S.qInit=50; S.cvd=L.cvd;
+    S.profile=meta.profile instanceof Map?meta.profile:new Map(); S.events=(meta.events||[]).filter(e=>now-e.t<keep); S.marks=meta.marks||[];
+    S.cols=cols.slice(-S.maxCols); S.colN=L.n+1; HIST.lastN=L.n; S.center=(L.bid+L.ask)/2; S.last=(L.bid+L.ask)/2; restored=(now-cols[0].t)/60000;
+    $("bkv").textContent="= "+S.bucket.toLocaleString("en-US",{maximumFractionDigits:10})+" USD"; }
+  const from=cols.length?cols[cols.length-1].t:now-keep;
+  const filled=now-from>2*S.speed ? await backfill(kind,from,now,gen) : 0;
+  if(gen!==S.gen) return;
+  if(S.events.length) renderEvents();
+  S.dirty=true;
+  if(restored>0.2||filled>0.2) toast(`Đã nạp ${restored>0.2?Math.round(restored)+" phút lịch sử đã lưu":""}${restored>0.2&&filled>0.2?" + ":""}${filled>0.2?Math.round(filled)+" phút giá/khối lượng từ nến Binance":""}`);
+}
+// Lấp khoảng trống bằng nến 1 phút: có giá + khối lượng mua/bán chủ động, KHÔNG có sổ lệnh (Binance không cho lấy sổ lệnh quá khứ)
+async function backfill(kind,from,to,gen){
+  const qs=`symbol=${S.sym}&interval=1m&startTime=${Math.floor(from/60000)*60000}&limit=60`;
+  const urls=kind==="fut"?[`https://fapi.binance.com/fapi/v1/klines?${qs}`]:[`https://api.binance.com/api/v3/klines?${qs}`,`https://data-api.binance.vision/api/v3/klines?${qs}`];
+  let K=null; for(const u of urls){ try{ const r=await fetch(u,{cache:"no-store"}); if(r.ok){ K=await r.json(); break; } }catch(e){} }
+  if(gen!==S.gen||!Array.isArray(K)||!K.length) return 0;
+  for(const k of K) for(const j of [1,2,3,4]) noteTick(String(k[j]));
+  if(!S.bucket) ensureBucket(+K[K.length-1][4]);
+  const B=S.bucket, per=60000/S.speed; let made=0;
+  const at=t=>{ for(let i=K.length-1;i>=0;i--) if(t>=K[i][0]) return K[i]; return null; };
+  for(let t=from+S.speed;t<=to;t+=S.speed){ const k=at(t); if(!k) continue;
+    const o=+k[1],h=+k[2],l=+k[3],c=+k[4], f=Math.min(1,(t-k[0])/60000), up=c>=o;
+    const pts=up?[o,l,h,c]:[o,h,l,c], seg=Math.min(2,Math.floor(f*3)), u=f*3-seg, px=pts[seg]+(pts[seg+1]-pts[seg])*u;
+    const bq=(+k[9])/per, sq=Math.max(0,(+k[5]-(+k[9])))/per, kk=Math.floor(px/B);
+    const tr=new Map(); tr.set(kk,{b:bq,s:sq}); S.cvd+=bq-sq;
+    const pe=S.profile.get(kk)||{b:0,s:0}; pe.b+=bq; pe.s+=sq; S.profile.set(kk,pe);
+    S.cols.push({n:S.colN++,t,keys:new Int32Array(0),qs:new Float32Array(0),bid:px,ask:px,trades:tr,buy:bq,sell:sq,liq:[],cvd:S.cvd,gap:true}); made++;
+    S.last=px; }
+  if(S.cols.length>S.maxCols) S.cols.splice(0,S.cols.length-S.maxCols);
+  if(S.center==null&&S.last!=null) S.center=S.last;
+  return made*S.speed/60000;
+}
+setInterval(saveHist,10000);
+document.addEventListener("visibilitychange",()=>{ if(document.hidden) saveHist(); });
+window.addEventListener("pagehide",()=>{ saveHist(); });
+
 // ---------- demo data ----------
 function startDemo(fromFail){
-  stopAll(); resetData(); S.sym="BTCUSDT"; $("symin").value="BTCUSDT"; S.tick=0.1; const gen=S.gen; $("sym").textContent="BTCUSDT · Dữ liệu mẫu";
+  stopAll(); resetData(); HIST.key=null; S.sym="BTCUSDT"; $("symin").value="BTCUSDT"; S.tick=0.1; const gen=S.gen; $("sym").textContent="BTCUSDT · Dữ liệu mẫu";
   if(!fromFail) status("Dữ liệu mẫu (không phải giá thật)","wait");
   let mid=75000, drift=0; const tick=0.1, rnd=()=>Math.random(), R=v=>+(Math.round(v/tick)*tick).toFixed(1);
   const walls=[[mid+40,110],[mid-35,130],[mid+120,160],[mid-110,150],[mid+220,220],[mid-240,200]];
@@ -578,7 +653,7 @@ function startDemo(fromFail){
 
 // ---------- controls ----------
 $("mkt").onchange=e=>{S.mkt=e.target.value; S.mkt==="demo"?startDemo(false):connect(S.mkt);};
-$("bucket").onchange=e=>{S.bmul=+e.target.value; S.bucket=null; S.cur=null; S.cols=[];S.profile.clear();S.walls.clear();S.marks=[];S.absFired.clear();S.center=null;S.dirty=true; if(S.mkt==="demo"&&!S.demo) startDemo(false);};
+$("bucket").onchange=e=>{S.bmul=+e.target.value; if(HIST.key){HIST.key=histKey(S.mkt);HIST.lastN=S.colN-1;} S.bucket=null; S.cur=null; S.cols=[];S.profile.clear();S.walls.clear();S.marks=[];S.absFired.clear();S.center=null;S.dirty=true; if(S.mkt==="demo"&&!S.demo) startDemo(false);};
 function openSym(){ S.tried1000=false; const v=($("symin").value||"").trim().toUpperCase().replace(/[^A-Z0-9]/g,""); if(!v) return; S.sym=v.endsWith("USDT")||v.endsWith("USDC")?v:v+"USDT"; $("symin").value=S.sym;
   try{localStorage.setItem("bm_sym",S.sym);}catch(e){}
   if(S.mkt==="demo"){ S.mkt="fut"; $("mkt").value="fut"; } connect(S.mkt); }
@@ -587,7 +662,7 @@ const POP=["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","DOGEUSDT","ADAUSDT
 function fillList(arr){ const dl=$("symlist"); dl.innerHTML=""; for(const x of arr){ const o=document.createElement("option"); o.value=x; dl.appendChild(o);} }
 fillList(POP);
 fetch("https://fapi.binance.com/fapi/v1/exchangeInfo").then(r=>r.json()).then(j=>{ const a=j.symbols.filter(x=>x.status==="TRADING"&&x.quoteAsset==="USDT").map(x=>x.symbol); if(a.length) fillList([...POP,...a.filter(x=>!POP.includes(x)).sort()]); }).catch(()=>{});
-$("speed").onchange=e=>{S.speed=+e.target.value; startClock();};
+$("speed").onchange=e=>{S.speed=+e.target.value; startClock(); if(HIST.key){HIST.key=histKey(S.mkt);HIST.lastN=-1;}};
 $("minb").onchange=e=>{S.minBubble=+e.target.value;};
 $("zin").onclick=()=>{S.rowPx=Math.min(24,S.rowPx*1.4);S.dirty=true;};
 $("zout").onclick=()=>{S.rowPx=Math.max(1,S.rowPx/1.4);S.dirty=true;};
