@@ -101,6 +101,16 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 #st2 .empty2{color:var(--mut);font-size:12px;padding:4px 0}
 #help{position:absolute;right:160px;top:10px;z-index:4;max-width:360px;background:rgba(17,23,34,.92);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--mut)}
 #help b{color:var(--fg)} #help .x{float:right;cursor:pointer;color:var(--fg)}
+/* chế độ ô lưới (nhúng trong grid.html) */
+.embed header{padding:3px 6px;gap:4px 8px;flex-wrap:nowrap;overflow:hidden}
+.embed #symin{width:96px;font-size:12px;padding:2px 5px} .embed .symbox button{padding:2px 6px}
+.embed .sym{display:none} .embed .px{font-size:14px;min-width:0}
+.embed #st{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.embed .ctl{flex-wrap:nowrap;gap:4px;margin-left:0} .embed .ctl>*{display:none}
+.embed .ctl>#statbtn,.embed .ctl>#more,.embed .ctl>#maxbtn{display:inline-flex;padding:2px 6px;font-size:11.5px}
+.embed header.open{flex-wrap:wrap} .embed header.open .ctl{flex-wrap:wrap} .embed header.open .ctl>*{display:flex}
+.embed #ev{width:230px;font-size:11px;max-height:40%} .embed #help{right:10px}
+#more,#maxbtn{display:none}
 .k{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:-1px;margin-right:4px}
 </style>
 </head>
@@ -123,6 +133,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
     <button id="hb" title="Cách đọc">?</button>
     <button id="autobtn" class="on" title="Tự tạo lệnh giấy từ sự kiện">🤖 Lệnh giấy: Bật</button>
     <button id="statbtn" title="Thống kê lệnh giấy">📊 Thống kê</button>
+    <button id="gridbtn" title="Chia màn hình nhiều ô, mỗi ô một mã (giống MT5)">▦ Chia ô</button>
+    <button id="more" title="Hiện / ẩn các tuỳ chỉnh">⋯</button><button id="maxbtn" title="Phóng to / thu nhỏ ô này">⤢</button>
     <button id="pause">Tạm dừng</button>
   </div>
 </header>
@@ -349,7 +361,9 @@ function mergeSigs(){
   S.sigClosed=[...closed.values()].sort((a,b)=>(a.tx||a.t)-(b.tx||b.t)).slice(-3000); S.sigOpen=open;
 }
 function saveSigs(){ try{ mergeSigs(); localStorage.setItem("bm_sigs",JSON.stringify(S.sigClosed)); localStorage.setItem("bm_sigopen",JSON.stringify(S.sigOpen.filter(o=>o.sym!=="DEMO"))); }catch(e){} }
-window.addEventListener("storage",e=>{ if(e.key==="bm_sigs"||e.key==="bm_sigopen"||e.key==="bm_clearT"){ mergeSigs(); renderStats(); } });
+window.addEventListener("storage",e=>{ if(e.key==="bm_sigs"||e.key==="bm_sigopen"||e.key==="bm_clearT"){ mergeSigs(); renderStats(); }
+  if(e.key==="bm_rules"){ try{ Object.assign(RULE,JSON.parse(e.newValue||"{}")); document.querySelectorAll("#strules [data-r]").forEach(el=>{ const k=el.dataset.r; if(el.type==="checkbox") el.checked=!!RULE[k]; else el.value=String(RULE[k]); }); }catch(err){} }
+  if(e.key==="bm_filt"){ try{ ACT=JSON.parse(e.newValue||"{}")||{}; renderStats(); }catch(err){} } });
 // lệnh đang mở được theo dõi trực tiếp -> ghi lại mốc đã kiểm tra
 function touchSigs(){ const live=S.mkt!=="demo"&&S.synced&&!S.paused; if(live) for(const o of S.sigOpen) if(o.sym===S.sym&&(o.mkt||"fut")===S.mkt&&Date.now()-(o.chk||o.t)<30000) o.chk=Date.now(); saveSigs(); }
 async function fetchKlines(kind,sym,start,limit){
@@ -730,7 +744,7 @@ async function fetchSnapshot(list){
 async function connect(kind,wsIdx=0){
   stopAll(); const gen=S.gen, ep=EPS(kind);
   await saveHist(); if(gen!==S.gen) return;
-  resetData(); $("sym").textContent=ep.name;
+  resetData(); $("sym").textContent=ep.name; if(S.onSym) S.onSym();
   status("Đang tải lịch sử…","wait");
   await restoreHist(kind,gen); if(gen!==S.gen) return;
   status("Đang kết nối Binance…","wait");
@@ -886,7 +900,7 @@ function startDemo(fromFail){
 $("mkt").onchange=e=>{S.mkt=e.target.value; S.mkt==="demo"?startDemo(false):connect(S.mkt);};
 $("bucket").onchange=e=>{S.bmul=+e.target.value; if(HIST.key){HIST.key=histKey(S.mkt);HIST.lastN=S.colN-1;} S.bucket=null; S.cur=null; S.cols=[];S.profile.clear();S.walls.clear();S.marks=[];S.absFired.clear();S.center=null;S.dirty=true; if(S.mkt==="demo"&&!S.demo) startDemo(false);};
 function openSym(){ S.tried1000=false; const v=($("symin").value||"").trim().toUpperCase().replace(/[^A-Z0-9]/g,""); if(!v) return; S.sym=v.endsWith("USDT")||v.endsWith("USDC")?v:v+"USDT"; $("symin").value=S.sym;
-  try{localStorage.setItem("bm_sym",S.sym);}catch(e){}
+  if(!document.body.classList.contains("embed")) try{localStorage.setItem("bm_sym",S.sym);}catch(e){}
   if(S.mkt==="demo"){ S.mkt="fut"; $("mkt").value="fut"; } connect(S.mkt); }
 $("symgo").onclick=openSym; $("symin").addEventListener("keydown",e=>{ if(e.key==="Enter") openSym(); });
 const POP=["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","DOGEUSDT","ADAUSDT","AVAXUSDT","LINKUSDT","SUIUSDT","TONUSDT","TRXUSDT","DOTUSDT","LTCUSDT","BCHUSDT","NEARUSDT","APTUSDT","ARBUSDT","OPUSDT","PEPEUSDT","WIFUSDT","SHIBUSDT","FILUSDT","ATOMUSDT","INJUSDT","TIAUSDT","SEIUSDT","ENAUSDT","HYPEUSDT","TAOUSDT"];
@@ -947,6 +961,14 @@ ov.addEventListener("pointerup",()=>{drag=null;});
 // ---------- boot ----------
 resize(); loadSigs(); setTimeout(()=>resolveOpen(true),1500); startClock(); requestAnimationFrame(frame); let lastRS=0; setInterval(()=>{ const n=Date.now(); if(S.sigOpen.length||n-lastRS>5000){ lastRS=n; renderStats(); } },1000);
 const q=new URLSearchParams(location.search);
+const EMBED=q.get("embed")==="1", CELL=+(q.get("cell")||0);
+const toParent=m=>{ if(EMBED&&window.parent!==window) try{ window.parent.postMessage({bm:1,cell:CELL,...m},"*"); }catch(e){} };
+if(EMBED){ document.body.classList.add("embed"); $("gridbtn").style.display="none"; $("ev").classList.add("min"); $("evmin").textContent="Mở";
+  $("more").onclick=()=>document.querySelector("header").classList.toggle("open");
+  $("maxbtn").onclick=()=>toParent({type:"max"});
+  document.querySelector("header").addEventListener("dblclick",e=>{ if(e.target.closest("input,select,button")) return; toParent({type:"max"}); }); }
+$("gridbtn").onclick=()=>{ location.href="grid.html"; };
+S.onSym=()=>toParent({type:"sym",sym:S.sym});
 let saved=null; try{saved=localStorage.getItem("bm_sym");}catch(e){}
 S.sym=(q.get("sym")||saved||"BTCUSDT").toUpperCase(); $("symin").value=S.sym;
 if(q.get("demo")==="1"){ $("mkt").value="demo"; S.mkt="demo"; startDemo(false); } else connect("fut");

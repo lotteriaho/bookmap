@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Bookmap chia ô</title>
+<style>
+:root{--bg:#0b0f16;--panel:#111722;--line:#223047;--fg:#d7e0ee;--mut:#7d8aa3;--accent:#f4b43a;--sans:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:13px/1.35 var(--sans)}
+body{display:flex;flex-direction:column}
+.bar{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:6px 10px;background:var(--panel);border-bottom:1px solid var(--line)}
+.bar h1{font-size:13px;margin:0 6px 0 0;white-space:nowrap}
+.bar .lab{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+button,input{background:#0d131d;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font:12px var(--sans);cursor:pointer}
+button:hover{border-color:var(--mut)} button.on{border-color:var(--accent);color:var(--accent)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.lay{display:flex;gap:4px}
+.lay button{width:34px;height:26px;padding:3px;display:grid;gap:2px}
+.lay button i{background:currentColor;opacity:.55;border-radius:1px}
+.sp{flex:1}
+#msg{color:var(--accent);font-size:12px}
+#grid{flex:1;display:grid;gap:4px;padding:4px;min-height:0}
+.cell{position:relative;border:1px solid var(--line);border-radius:6px;overflow:hidden;min-height:0;min-width:0;background:var(--bg)}
+.cell iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+#grid.max .cell{display:none} #grid.max .cell.big{display:block;grid-area:1/1/-1/-1}
+@media (max-width:700px){ #grid{grid-template-columns:1fr!important;grid-auto-rows:minmax(360px,1fr);overflow:auto} }
+</style>
+</head>
+<body>
+<div class="bar">
+  <h1>▦ Bookmap chia ô</h1>
+  <span class="lab">Bố cục</span>
+  <div class="lay" id="lay"></div>
+  <span id="msg"></span>
+  <span class="sp"></span>
+  <button id="reset" title="Đưa mã các ô về mặc định">Mã mặc định</button>
+  <a href="index.html"><button title="Quay lại trang một biểu đồ">↗ Một biểu đồ</button></a>
+</div>
+<div id="grid"></div>
+<script>
+(()=>{
+"use strict";
+// bố cục: [số cột, số hàng]
+const LAYOUTS={"1":[1,1],"2":[2,1],"2v":[1,2],"3":[3,1],"4":[2,2],"6":[3,2]};
+const DEF=["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","DOGEUSDT"];
+let st={lay:"4",syms:[...DEF]};
+try{ const j=JSON.parse(localStorage.getItem("bm_grid")||"null"); if(j&&LAYOUTS[j.lay]&&Array.isArray(j.syms)) st={lay:j.lay,syms:[...j.syms,...DEF].slice(0,6)}; }catch(e){}
+const save=()=>{ try{ localStorage.setItem("bm_grid",JSON.stringify(st)); }catch(e){} };
+const $=id=>document.getElementById(id), G=$("grid");
+let msgT=0; const msg=t=>{ $("msg").textContent=t; clearTimeout(msgT); msgT=setTimeout(()=>{$("msg").textContent="";},6000); };
+
+function icon(k){ const [c,r]=LAYOUTS[k]; let h=""; for(let i=0;i<c*r;i++) h+="<i></i>"; return {h,c,r}; }
+function drawLay(){ const L=$("lay"); L.innerHTML="";
+  for(const k of ["1","2","2v","3","4","6"]){ const {h,c,r}=icon(k), b=document.createElement("button");
+    b.innerHTML=h; b.style.gridTemplateColumns=`repeat(${c},1fr)`; b.style.gridTemplateRows=`repeat(${r},1fr)`;
+    b.title=`${c*r} ô (${c} cột × ${r} hàng)`; b.className=k===st.lay?"on":""; b.onclick=()=>{ st.lay=k; save(); build(); drawLay(); }; L.appendChild(b); } }
+
+// giữ iframe đã có khi đổi bố cục để không phải tải lại biểu đồ
+const frames=[];
+function build(){
+  const [c,r]=LAYOUTS[st.lay], n=c*r;
+  G.classList.remove("max"); G.style.gridTemplateColumns=`repeat(${c},minmax(0,1fr))`; G.style.gridTemplateRows=`repeat(${r},minmax(0,1fr))`;
+  for(let i=0;i<6;i++){
+    if(i<n&&!frames[i]){ const d=document.createElement("div"); d.className="cell"; const f=document.createElement("iframe");
+      f.src=`index.html?embed=1&cell=${i}&sym=${encodeURIComponent(st.syms[i])}`; f.title="Bookmap "+st.syms[i]; d.appendChild(f); frames[i]=d; }
+    if(frames[i]){ if(i<n){ if(frames[i].parentNode!==G) G.appendChild(frames[i]); frames[i].classList.remove("big"); }
+      else { frames[i].remove(); frames[i]=null; } }   // ô bị bỏ: đóng hẳn để không chạy ngầm tạo lệnh
+  }
+  checkDup();
+}
+function checkDup(){ const n=LAYOUTS[st.lay][0]*LAYOUTS[st.lay][1], seen={};
+  for(let i=0;i<n;i++){ const s=st.syms[i]; if(seen[s]!=null){ msg(`⚠ Ô ${seen[s]+1} và ô ${i+1} cùng mã ${s}: lệnh giấy sẽ bị tạo trùng, nên đổi một ô sang mã khác.`); return; } seen[s]=i; } }
+
+window.addEventListener("message",e=>{ const d=e.data; if(!d||d.bm!==1) return; const i=d.cell|0;
+  if(d.type==="sym"&&d.sym&&st.syms[i]!==d.sym){ st.syms[i]=d.sym; save(); checkDup(); }
+  if(d.type==="max"&&frames[i]){ const on=!(G.classList.contains("max")&&frames[i].classList.contains("big"));
+    frames.forEach(f=>f&&f.classList.remove("big")); G.classList.toggle("max",on); if(on) frames[i].classList.add("big"); }
+});
+$("reset").onclick=()=>{ st.syms=[...DEF]; save(); frames.forEach((f,i)=>{ if(f){ f.querySelector("iframe").src=`index.html?embed=1&cell=${i}&sym=${DEF[i]}`; } }); msg("Đã đưa các ô về mã mặc định"); };
+drawLay(); build();
+})();
+</script>
+</body>
+</html>
