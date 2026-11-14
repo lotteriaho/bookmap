@@ -593,13 +593,17 @@ async function restoreHist(kind,gen){
   if(gen!==S.gen) return;
   if(S.events.length) renderEvents();
   S.dirty=true;
-  if(restored>0.2||filled>0.2) toast(`Đã nạp ${restored>0.2?Math.round(restored)+" phút lịch sử đã lưu":""}${restored>0.2&&filled>0.2?" + ":""}${filled>0.2?Math.round(filled)+" phút giá/khối lượng từ nến Binance":""}`);
+  const dur=m=>m>=1?Math.round(m)+" phút":Math.round(m*60)+" giây";
+  if(restored>0.1||filled>0.1) toast(`Đã nạp ${restored>0.1?dur(restored)+" lịch sử đã lưu":""}${restored>0.1&&filled>0.1?" + ":""}${filled>0.1?dur(filled)+" giá/khối lượng từ nến Binance":""}`);
 }
 // Lấp khoảng trống bằng nến 1 phút: có giá + khối lượng mua/bán chủ động, KHÔNG có sổ lệnh (Binance không cho lấy sổ lệnh quá khứ)
 async function backfill(kind,from,to,gen){
   const qs=`symbol=${S.sym}&interval=1m&startTime=${Math.floor(from/60000)*60000}&limit=60`;
-  const urls=kind==="fut"?[`https://fapi.binance.com/fapi/v1/klines?${qs}`]:[`https://api.binance.com/api/v3/klines?${qs}`,`https://data-api.binance.vision/api/v3/klines?${qs}`];
-  let K=null; for(const u of urls){ try{ const r=await fetch(u,{cache:"no-store"}); if(r.ok){ K=await r.json(); break; } }catch(e){} }
+  const urls=kind==="fut"?[`https://fapi.binance.com/fapi/v1/klines?${qs}`,`https://data-api.binance.vision/api/v3/klines?${qs.replace(/^symbol=1000/,"symbol=")}`]:[`https://api.binance.com/api/v3/klines?${qs}`,`https://data-api.binance.vision/api/v3/klines?${qs}`];
+  let K=null; for(const u of urls){ try{ const r=await fetch(u,{cache:"no-store"}); if(r.ok){ K=await r.json();
+      if(kind==="fut"&&/^1000/.test(S.sym)&&u.includes("binance.vision")&&Array.isArray(K)) // giá spot PEPE = giá 1000PEPE / 1000
+        K=K.map(k=>[k[0],...[1,2,3,4].map(j=>String(+(k[j]*1000).toPrecision(8))),String(k[5]/1000),k[6],k[7],k[8],String(k[9]/1000)]);
+      break; } }catch(e){} }
   if(gen!==S.gen||!Array.isArray(K)||!K.length) return 0;
   for(const k of K) for(const j of [1,2,3,4]) noteTick(String(k[j]));
   if(!S.bucket) ensureBucket(+K[K.length-1][4]);
