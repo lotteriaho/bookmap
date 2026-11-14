@@ -47,6 +47,9 @@ const DEF=["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","DOGEUSDT"];
 let st={lay:"4",syms:[...DEF]};
 try{ const j=JSON.parse(localStorage.getItem("bm_grid")||"null"); if(j&&LAYOUTS[j.lay]&&Array.isArray(j.syms)) st={lay:j.lay,syms:[...j.syms,...DEF].slice(0,6)}; }catch(e){}
 const save=()=>{ try{ localStorage.setItem("bm_grid",JSON.stringify(st)); }catch(e){} };
+// link dạng grid.html#sync=URL: lưu URL Google Sheet và chuyển cho từng ô
+let SYNC=""; try{ SYNC=new URLSearchParams(location.hash.slice(1)).get("sync")||localStorage.getItem("bm_sync")||""; if(SYNC) localStorage.setItem("bm_sync",SYNC); }catch(e){}
+const src=(i,sym)=>`index.html?embed=1&cell=${i}&sym=${encodeURIComponent(sym)}${SYNC?"#sync="+encodeURIComponent(SYNC):""}`;
 const $=id=>document.getElementById(id), G=$("grid");
 let msgT=0; const msg=t=>{ $("msg").textContent=t; clearTimeout(msgT); msgT=setTimeout(()=>{$("msg").textContent="";},6000); };
 
@@ -63,7 +66,7 @@ function build(){
   G.classList.remove("max"); G.style.gridTemplateColumns=`repeat(${c},minmax(0,1fr))`; G.style.gridTemplateRows=`repeat(${r},minmax(0,1fr))`;
   for(let i=0;i<6;i++){
     if(i<n&&!frames[i]){ const d=document.createElement("div"); d.className="cell"; const f=document.createElement("iframe");
-      f.src=`index.html?embed=1&cell=${i}&sym=${encodeURIComponent(st.syms[i])}`; f.title="Bookmap "+st.syms[i]; d.appendChild(f); frames[i]=d; }
+      f.src=src(i,st.syms[i]); f.title="Bookmap "+st.syms[i]; d.appendChild(f); frames[i]=d; }
     if(frames[i]){ if(i<n){ if(frames[i].parentNode!==G) G.appendChild(frames[i]); frames[i].classList.remove("big"); }
       else { frames[i].remove(); frames[i]=null; } }   // ô bị bỏ: đóng hẳn để không chạy ngầm tạo lệnh
   }
@@ -77,7 +80,7 @@ window.addEventListener("message",e=>{ const d=e.data; if(!d||d.bm!==1) return; 
   if(d.type==="max"&&frames[i]){ const on=!(G.classList.contains("max")&&frames[i].classList.contains("big"));
     frames.forEach(f=>f&&f.classList.remove("big")); G.classList.toggle("max",on); if(on) frames[i].classList.add("big"); }
 });
-$("reset").onclick=()=>{ st.syms=[...DEF]; save(); frames.forEach((f,i)=>{ if(f){ f.querySelector("iframe").src=`index.html?embed=1&cell=${i}&sym=${DEF[i]}`; } }); msg("Đã đưa các ô về mã mặc định"); };
+$("reset").onclick=()=>{ st.syms=[...DEF]; save(); frames.forEach((f,i)=>{ if(f){ f.querySelector("iframe").src=src(i,DEF[i]); } }); msg("Đã đưa các ô về mã mặc định"); };
 drawLay(); build();
 })();
 </script>
