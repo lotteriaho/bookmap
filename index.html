@@ -170,8 +170,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
         <label><input type="checkbox" data-r="onC" checked><b>C · Rút tường</b></label>
         <span>Tường ≥ <select data-r="pullMin"><option value="0">Tự động</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="2000000">2 tr</option><option value="3000000">3 tr</option><option value="5000000">5 tr</option><option value="10000000">10 tr</option></select></span>
         <span>Đứng ≥ <select data-r="pullAge"><option value="15">15 s</option><option value="30">30 s</option><option value="60">60 s</option><option value="120">2 phút</option></select></span>
-        <label><input type="checkbox" data-r="onE" checked><b>E · Bẫy phá tường</b></label><span class="mut" style="grid-column:2/-1">ngược B · chờ xác nhận 0,25×SL gốc trong 120 s · SL 2×SL gốc, TP 1:1, 30 phút</span>
-        <label><input type="checkbox" data-r="onF" checked><b>F · Bẫy rút tường</b></label><span class="mut" style="grid-column:2/-1">ngược C · chờ xác nhận 0,25×SL gốc trong 120 s · SL 2×SL gốc, TP 1:1, 30 phút</span>
+        <label><input type="checkbox" data-r="onE" checked><b>E · Bẫy phá tường</b></label><span class="mut" style="grid-column:2/-1">ngược B · chờ xác nhận 0,25×SL gốc trong 120 s · SL 2×SL gốc · TP/thoát sớm như dòng dưới</span>
+        <label><input type="checkbox" data-r="onF" checked><b>F · Bẫy rút tường</b></label><span class="mut" style="grid-column:2/-1">ngược C · chờ xác nhận 0,25×SL gốc trong 120 s · SL 2×SL gốc</span>
+        <span style="grid-column:1/-1">E/F: TP <select data-r="efTP"><option value="0.5">0,5R</option><option value="0.75">0,75R</option><option value="1">1R</option><option value="1.5">1,5R</option></select> · thoát sớm nếu chưa có lời sau <select data-r="efTStop"><option value="0">không</option><option value="5">5 phút</option><option value="7">7 phút</option><option value="10">10 phút</option><option value="15">15 phút</option></select></span>
         <label><input type="checkbox" data-r="onG" checked><b>G · Chạm tường dày</b></label>
         <span>Dày = gấp <select data-r="gMul"><option value="1.5">1,5</option><option value="2">2</option><option value="3">3</option><option value="5">5</option></select> lần ngưỡng tường · tối thiểu <select data-r="gMin"><option value="0">Tự động</option><option value="1000000">1 tr</option><option value="3000000">3 tr</option><option value="5000000">5 tr</option><option value="10000000">10 tr</option></select></span>
         <span>TP <select data-r="gRR"><option value="0.75">0,75R</option><option value="1">1R (1:1)</option><option value="1.5">1,5R</option><option value="2">2R</option></select></span>
@@ -182,7 +183,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
         <div class="rh">Sao lưu lệnh giấy <span class="mut" id="synst"></span></div>
         <input id="syncurl" placeholder="Dán URL ứng dụng web Google Apps Script (…/exec)" spellcheck="false" autocomplete="off">
         <div style="display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;font-size:11.5px;color:var(--fg)"><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgA" checked> Báo Telegram + "ting" cho kèo đang test:</label>
-          <label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgEF" checked> E/F</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgD"> D</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgG" checked> G</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgH1"> A chuẩn (kèo lọc)</label></div>
+          <label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgEF" checked> E/F</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgD"> D</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgG" checked> G</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgH1"> A chuẩn (kèo lọc)</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgBTC"> chỉ BTC</label></div>
         <div class="row"><button id="syncsave">Lưu & đồng bộ</button><button id="syncnow">Đồng bộ ngay</button><button id="csvin">Nhập CSV</button><input type="file" id="csvfile" accept=".csv,text/csv" hidden></div>
         <details class="note"><summary>Cách tạo Google Sheet để lưu (làm 1 lần, ~3 phút)</summary>
           1. Tạo một Google Sheet mới → menu <b>Tiện ích mở rộng → Apps Script</b>.<br>
@@ -438,6 +439,7 @@ async function resolveOpen(all){
         const sl=o.dir>0?lo<=o.sl:hi>=o.sl, tp=o.dir>0?hi>=o.tp:lo<=o.tp;
         if(sl){ closeSignal(o,o.sl,"chạm SL (nến 1m)"); closed=true; break; }   // cùng nến chạm cả 2 -> tính SL cho chắc
         if(tp){ closeSignal(o,o.tp,"chạm TP (nến 1m)"); closed=true; break; }
+        if(o.tstop&&!o.tsDone&&t0+60000>=o.t+o.tstop&&o.t+o.tstop<=now){ o.tsDone=true; if(o.dir*(cl-o.entry)<0){ closeSignal(o,cl,`thoát sớm ${Math.round(o.tstop/60000)} phút (nến 1m)`); closed=true; break; } }
         if(t0+60000>=exp&&exp<=now){ closeSignal(o,cl,`hết ${Math.round((o.hold||1800000)/60000)} phút (nến 1m)`); closed=true; break; }
       }
       if(closed) done++; else { o.chk=Date.now(); o.fails=0; const L=K[K.length-1]; o.mark=+L[4]; } }
@@ -473,7 +475,7 @@ function features(dir){
     raw:{...(t60?{xh60_pct:t60.pct}:{}),xh10_pct:+(dir*tr/m0*100).toFixed(3), cvd60_usd:Math.round(dir*cvd*m0), so_lech:+(dir*imb).toFixed(3), kl_x:+volX.toFixed(2), gio_utc:uh,
          spread_bps:+((last.ask-last.bid)/m0*1e4).toFixed(2), bien_dong5_pct:+(recentRange(300)/m0*100).toFixed(3)}};
 }
-const RULE_DEF={tgEF:true,tgD:false,tgG:true,tgH1:false,onG:true,gMul:2,gMin:0,gRR:1,tgA:true,aH1:false,onA:true,onB:true,onC:true,onD:false,onE:true,onF:true,absMin:0,restMin:0,brkMin:0,brkAge:15,pullMin:0,pullAge:15,liqMinD:500000};
+const RULE_DEF={efTP:0.75,efTStop:10,tgBTC:false,tgEF:true,tgD:false,tgG:true,tgH1:false,onG:true,gMul:2,gMin:0,gRR:1,tgA:true,aH1:false,onA:true,onB:true,onC:true,onD:false,onE:true,onF:true,absMin:0,restMin:0,brkMin:0,brkAge:15,pullMin:0,pullAge:15,liqMinD:500000};
 let RULE={...RULE_DEF}, RULE_SAVED=null; try{ RULE_SAVED=JSON.parse(localStorage.getItem("bm_rules")||"null"); Object.assign(RULE,RULE_SAVED||{}); }catch(e){}
 if(RULE_SAVED&&(RULE_SAVED.v||0)<2||!RULE_SAVED){ RULE.onD=false; RULE.tgD=false; RULE.v=2; try{ localStorage.setItem("bm_rules",JSON.stringify(RULE)); }catch(e){} }   // 15/11: D lỗ rõ (64 lệnh, −0,57R) → tắt
 // trả về lý do không vào lệnh, hoặc "" nếu đạt
@@ -498,14 +500,14 @@ const nActive=()=>FILT.filter(f=>ACT[f[0]]).length+(ACT._set?1:0)+(ACT._sym?1:0)
 const isH1=o=>o.setup==="A"&&(o.sym==="BTCUSDT"||o.sym==="ETHUSDT")&&!!o.f&&o.f.book&&!o.f.trend;
 // Kèo 2 (tìm ra 14/11 tối bằng mô phỏng lại 110 lệnh trên giá 1 giây): đánh ngược B/C
 // Kèo 2 (bản 3, 15/11): E/F có xác nhận VÀ cùng chiều xu hướng 1 giờ — kiểm chứng trên dữ liệu đêm 14/11: 36 lệnh, 64%, +0,16R
-const isK2=o=>(o.setup==="E"||o.setup==="F")&&o.r0!=null&&!!o.f&&o.f.tr60===true;
+const isK2=o=>(o.setup==="E"||o.setup==="F")&&!!o.v4&&!!o.f&&o.f.tr60===true;   // bản 4: TP 0,75R + thoát sớm 10 phút
 const isK3=o=>o.setup==="D";
 const isK4=o=>o.setup==="G";
 // chỉ báo Telegram / kêu "ting" cho các kèo đang test (E/F, D, G); A chuẩn là kèo lọc từ A nên mặc định không báo
-const isWatch=o=>(isK2(o)&&RULE.tgEF)||(isK3(o)&&RULE.tgD)||(isK4(o)&&RULE.tgG)||(isH1(o)&&RULE.tgH1);
+const isWatch=o=>(!RULE.tgBTC||o.sym==="BTCUSDT")&&((isK2(o)&&RULE.tgEF)||(isK3(o)&&RULE.tgD)||(isK4(o)&&RULE.tgG)||(isH1(o)&&RULE.tgH1));
 let K4T=0; try{ K4T=+(localStorage.getItem("bm_k4")||0); if(!K4T){ K4T=Date.now(); localStorage.setItem("bm_k4",String(K4T)); } }catch(e){ K4T=Date.now(); }
 let K3T=0; try{ K3T=+(localStorage.getItem("bm_k3")||0); if(!K3T){ K3T=Date.now(); localStorage.setItem("bm_k3",String(K3T)); } }catch(e){ K3T=Date.now(); }
-let K2T=0; try{ K2T=+(localStorage.getItem("bm_k2c")||0); if(!K2T){ K2T=Date.now(); localStorage.setItem("bm_k2c",String(K2T)); } }catch(e){ K2T=Date.now(); }
+let K2T=0; try{ K2T=+(localStorage.getItem("bm_k2d")||0); if(!K2T){ K2T=Date.now(); localStorage.setItem("bm_k2d",String(K2T)); } }catch(e){ K2T=Date.now(); }
 let H1T=0; try{ H1T=+(localStorage.getItem("bm_h1")||0); if(!H1T){ H1T=Date.now(); localStorage.setItem("bm_h1",String(H1T)); } }catch(e){ H1T=Date.now(); }
 // SL mà một lệnh hướng dir vào ở px sẽ dùng khi mốc là ref (giống B/C gốc)
 function baseRisk(dir,ref,px){ const B=S.bucket, minRisk=Math.max(4*B,0.5*recentRange(60),px*S.fee*3);
@@ -524,7 +526,7 @@ function checkPending(bid,ask){ const now=Date.now();
   for(const q of [...S.pend]){
     if(now>q.exp){ S.pend=S.pend.filter(x=>x!==q); continue; }
     if((q.dir>0&&ask>=q.trg)||(q.dir<0&&bid<=q.trg)){ S.pend=S.pend.filter(x=>x!==q);
-      openSignal(q.setup,q.dir,q.trg,q.why+" (đã xác nhận)",1,{...q.info,riskAbs:2*q.r0,r0:q.r0,hold:1800000}); } } }
+      openSignal(q.setup,q.dir,q.trg,q.why+" (đã xác nhận)",RULE.efTP,{...q.info,riskAbs:2*q.r0,r0:q.r0,hold:1800000,tstop:RULE.efTStop*60000,v4:true}); } } }
 function openSignal(setup,dir,ref,why,rr=2,info={}){
   if(!S.auto||S.bestBid==null||!S.bucket) return "";
   const F0=features(dir); info.f=F0&&F0.b;
@@ -537,7 +539,7 @@ function openSignal(setup,dir,ref,why,rr=2,info={}){
   if(info.riskAbs) sl=px-dir*info.riskAbs;
   const risk=Math.abs(px-sl); if(risk>px*(info.riskAbs?0.024:0.012)) return " · không vào lệnh: SL quá xa";           // SL quá xa thì bỏ
   const tp=px+dir*rr*risk;
-  const o={id:Date.now()+Math.random(),t:Date.now(),chk:Date.now(),mkt:S.mkt,sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open",...(F0?{f:F0.b,raw:F0.raw}:{}),sz:info.sz||0,rest:info.rest,age:info.age,...(info.hold?{hold:info.hold}:{}),...(info.r0?{r0:info.r0}:{})};
+  const o={id:Date.now()+Math.random(),t:Date.now(),chk:Date.now(),mkt:S.mkt,sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open",...(F0?{f:F0.b,raw:F0.raw}:{}),sz:info.sz||0,rest:info.rest,age:info.age,...(info.hold?{hold:info.hold}:{}),...(info.r0?{r0:info.r0}:{}),...(info.tstop?{tstop:info.tstop}:{}),...(info.v4?{v4:true}:{})};
   S.sigOpen.push(o); saveSigs(); try{ tgOpen(o); }catch(e){}
   addEvent("sig",px,`Lệnh giấy ${SETUP[setup]}: ${dir>0?"MUA":"BÁN"} @ ${fp(px)} · SL ${fp(sl)} · TP ${fp(tp)}`,isWatch(o)?"keo":false);
   renderStats();
@@ -558,6 +560,9 @@ function checkSignals(bid,ask){
   for(const o of [...S.sigOpen]){ if(o.sym!==sym||(o.mkt||"fut")!==S.mkt&&sym!=="DEMO") continue;
     if(sym!=="DEMO"&&now-(o.chk||o.t)>30000) continue;   // đang chờ chấm bằng nến 1m cho đoạn bị đóng trang
     trackEx(o,o.dir*((o.dir>0?bid:ask)-o.entry)/o.risk,now);
+    // thoát sớm: sau tstop phút mà giá vẫn chưa có lời (dưới giá vào)
+    if(o.tstop&&!o.tsDone&&now-o.t>=o.tstop){ o.tsDone=true; const px=o.dir>0?bid:ask;
+      if(o.dir*(px-o.entry)<0){ closeSignal(o,px,`thoát sớm ${Math.round(o.tstop/60000)} phút`); continue; } }
     if(o.dir>0){ if(bid<=o.sl) closeSignal(o,o.sl,"chạm SL"); else if(bid>=o.tp) closeSignal(o,o.tp,"chạm TP"); else if(now-o.t>(o.hold||1800000)) closeSignal(o,bid,`hết ${Math.round((o.hold||1800000)/60000)} phút`); }
     else { if(ask>=o.sl) closeSignal(o,o.sl,"chạm SL"); else if(ask<=o.tp) closeSignal(o,o.tp,"chạm TP"); else if(now-o.t>(o.hold||1800000)) closeSignal(o,ask,`hết ${Math.round((o.hold||1800000)/60000)} phút`); } }
 }
@@ -660,9 +665,9 @@ function renderStats(){
   D.getElementById("h1view").onclick=()=>{ ACT={_set:"A",_sym:"BTCUSDT,ETHUSDT",book:true,trend:"no"}; try{localStorage.setItem("bm_filt",JSON.stringify(ACT));}catch(e){} D.getElementById("stsym").value="all"; renderStats(); toast("Đang lọc theo kèo A chuẩn — bấm Bỏ lọc để xem lại tất cả"); };
   { const all3=S.sigClosed.filter(isK2), a3=st(all3.filter(o=>o.t>=K2T)), need2=40, ok2=a3.n>=30&&a3.wr>=0.6&&a3.avg>=0.15, bad2=a3.n>=30&&!ok2;
     const opE=S.sigOpen.filter(isK2).length;
-    D.getElementById("sth2").innerHTML=`<div class="h1t"><b>Kèo thử nghiệm 2: Bẫy tường (E + F) · cùng chiều xu hướng 1 giờ</b><span class="mut">Tường bị phá / bị rút → chờ giá quay đầu xác nhận → đánh ngược, CHỈ khi cùng chiều giá 1 giờ · TP = SL (1:1) · tối đa 30 phút · Telegram chỉ báo lệnh đạt</span></div>
+    D.getElementById("sth2").innerHTML=`<div class="h1t"><b>Kèo thử nghiệm 2: Bẫy tường (E + F) · cùng chiều xu hướng 1 giờ</b><span class="mut">Tường bị phá / bị rút → chờ giá quay đầu xác nhận → đánh ngược, CHỈ khi cùng chiều giá 1 giờ · SL 2×SL gốc · TP ${String(RULE.efTP).replace(".",",")}R · thoát nếu sau ${RULE.efTStop||"–"} phút chưa có lời · Telegram chỉ báo lệnh đạt</span></div>
       <div class="h1g"><div><span>Dữ liệu mới (từ ${new Date(K2T).toLocaleString("vi-VN",{hour12:false,day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})})</span><b class="${a3.n?cls(a3.avg):""}">${a3.n?`${a3.n} lệnh · ${Math.round(a3.wr*100)}% · ${sgn(a3.avg)}R`:"chưa có lệnh"}${opE?` <span class="tag">${opE} mở</span>`:""}</b></div>
-      <div><span>Kiểm chứng đêm 14/11 (dữ liệu mới)</span><b class="mut">36 lệnh · 64% · +0,16R</b></div></div>
+      <div><span>Ước tính trên 43 lệnh đêm 14/11 (giá 1 giây)</span><b class="mut">72% · +0,22R/lệnh</b></div></div>
       <div class="h1p"><i style="width:${Math.min(100,a3.n/need2*100)}%"></i></div>
       <div class="ft">${ok2?'<span class="pos">✔ Đạt: ≥ 30 lệnh mới, thắng ≥ 60%, ≥ +0,15R/lệnh.</span>':bad2?'<span class="neg">✘ Không đạt trên dữ liệu mới.</span>':`Cần ~${need2} lệnh mới (đang ${a3.n}). Đạt khi thắng ≥ 60% và ≥ +0,15R/lệnh.`}</div>
       <button id="h2view">Xem các lệnh kèo này</button>`;
@@ -1061,7 +1066,7 @@ const fpx=(v,ref)=>{ const d=ref>=1000?1:ref>=10?2:ref>=1?3:6; return (+v).toLoc
 const keoName=o=>"Kèo "+o.setup;   // ngắn gọn: Kèo A, Kèo E, Kèo F, Kèo D, Kèo G
 function tgOpen(o){ if(!isWatch(o)) return; const c=o.sym.replace(/USDT$/,"");
   tgNotify(o.id+":o",`[${keoName(o)}]\n${o.dir>0?"🟢 <b>MUA":"🔴 <b>BÁN"} ${c}</b>\nVào: ${fpx(o.entry,o.entry)}\nSL: ${fpx(o.sl,o.entry)}\nTP: ${fpx(o.tp,o.entry)}`); }
-function tgClose(o){ if(!isWatch(o)) return; const c=o.sym.replace(/USDT$/,""), h=/TP/.test(o.how)?"chạm TP":/SL/.test(o.how)?"chạm SL":`hết ${Math.round((o.hold||1800000)/60000)} phút`;
+function tgClose(o){ if(!isWatch(o)) return; const c=o.sym.replace(/USDT$/,""), h=/TP/.test(o.how)?"chạm TP":/SL/.test(o.how)?"chạm SL":/thoát sớm/.test(o.how)?`thoát sớm (sau ${Math.round((o.tstop||0)/60000)} phút chưa có lời)`:`hết ${Math.round((o.hold||1800000)/60000)} phút`;
   tgNotify(o.id+":c",`${o.R>0?"✅":"❌"} ${h} (${o.R>0?"+":""}${o.R.toFixed(2)}R)`,o.id+":o"); }
 function parseCSV(t){ const rows=[]; let row=[], f="", q=false;
   for(let i=0;i<t.length;i++){ const c=t[i];
