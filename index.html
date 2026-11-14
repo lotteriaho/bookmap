@@ -181,7 +181,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
       <div class="sync" id="stsync">
         <div class="rh">Sao lưu lệnh giấy <span class="mut" id="synst"></span></div>
         <input id="syncurl" placeholder="Dán URL ứng dụng web Google Apps Script (…/exec)" spellcheck="false" autocomplete="off">
-        <label style="text-transform:none;letter-spacing:0;font-size:11.5px;color:var(--fg)"><input type="checkbox" data-r="tgA" checked> Báo Telegram mỗi lệnh <b>kèo thử nghiệm</b> (A chuẩn, E/F, D, G — vào + đóng) — cần cài TG_TOKEN, TG_CHAT trong Apps Script</label>
+        <div style="display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;font-size:11.5px;color:var(--fg)"><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgA" checked> Báo Telegram + "ting" cho kèo đang test:</label>
+          <label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgEF" checked> E/F</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgD" checked> D</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgG" checked> G</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgH1"> A chuẩn (kèo lọc)</label></div>
         <div class="row"><button id="syncsave">Lưu & đồng bộ</button><button id="syncnow">Đồng bộ ngay</button><button id="csvin">Nhập CSV</button><input type="file" id="csvfile" accept=".csv,text/csv" hidden></div>
         <details class="note"><summary>Cách tạo Google Sheet để lưu (làm 1 lần, ~3 phút)</summary>
           1. Tạo một Google Sheet mới → menu <b>Tiện ích mở rộng → Apps Script</b>.<br>
@@ -461,7 +462,7 @@ function features(dir){
     raw:{xh10_pct:+(dir*tr/m0*100).toFixed(3), cvd60_usd:Math.round(dir*cvd*m0), so_lech:+(dir*imb).toFixed(3), kl_x:+volX.toFixed(2), gio_utc:uh,
          spread_bps:+((last.ask-last.bid)/m0*1e4).toFixed(2), bien_dong5_pct:+(recentRange(300)/m0*100).toFixed(3)}};
 }
-const RULE_DEF={onG:true,gMul:2,gMin:0,gRR:1,tgA:true,aH1:false,onA:true,onB:true,onC:true,onD:true,onE:true,onF:true,absMin:0,restMin:0,brkMin:0,brkAge:15,pullMin:0,pullAge:15,liqMinD:500000};
+const RULE_DEF={tgEF:true,tgD:true,tgG:true,tgH1:false,onG:true,gMul:2,gMin:0,gRR:1,tgA:true,aH1:false,onA:true,onB:true,onC:true,onD:true,onE:true,onF:true,absMin:0,restMin:0,brkMin:0,brkAge:15,pullMin:0,pullAge:15,liqMinD:500000};
 let RULE={...RULE_DEF}; try{ Object.assign(RULE,JSON.parse(localStorage.getItem("bm_rules")||"{}")||{}); }catch(e){}
 // trả về lý do không vào lệnh, hoặc "" nếu đạt
 function ruleFail(setup,info){
@@ -487,7 +488,8 @@ const isH1=o=>o.setup==="A"&&(o.sym==="BTCUSDT"||o.sym==="ETHUSDT")&&!!o.f&&o.f.
 const isK2=o=>(o.setup==="E"||o.setup==="F")&&o.r0!=null;   // chỉ tính bản 2 (có xác nhận)
 const isK3=o=>o.setup==="D";
 const isK4=o=>o.setup==="G";
-const isWatch=o=>isH1(o)||isK2(o)||isK3(o)||isK4(o);
+// chỉ báo Telegram / kêu "ting" cho các kèo đang test (E/F, D, G); A chuẩn là kèo lọc từ A nên mặc định không báo
+const isWatch=o=>(isK2(o)&&RULE.tgEF)||(isK3(o)&&RULE.tgD)||(isK4(o)&&RULE.tgG)||(isH1(o)&&RULE.tgH1);
 let K4T=0; try{ K4T=+(localStorage.getItem("bm_k4")||0); if(!K4T){ K4T=Date.now(); localStorage.setItem("bm_k4",String(K4T)); } }catch(e){ K4T=Date.now(); }
 let K3T=0; try{ K3T=+(localStorage.getItem("bm_k3")||0); if(!K3T){ K3T=Date.now(); localStorage.setItem("bm_k3",String(K3T)); } }catch(e){ K3T=Date.now(); }
 let K2T=0; try{ K2T=+(localStorage.getItem("bm_k2b")||0); if(!K2T){ K2T=Date.now(); localStorage.setItem("bm_k2b",String(K2T)); } }catch(e){ K2T=Date.now(); }
