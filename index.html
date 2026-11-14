@@ -54,7 +54,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 #st2 .cfg label{display:flex;gap:6px;align-items:center;color:var(--mut);font-size:11px}
 #st2 .cfg details{flex-basis:100%}
 #st2 .sync{flex-basis:100%;display:flex;flex-direction:column;gap:5px;border-top:1px solid var(--line);padding-top:8px}
-#st2 .sync .rh{font-size:12px} #st2 .sync input{width:100%;font:11.5px var(--mono)} #st2 .sync .row{display:flex;gap:6px;flex-wrap:wrap}
+#st2 .sync .rh{font-size:12px} #st2 .acctset{font-size:11.5px;color:var(--mut);line-height:2} #st2 .acctset b{color:var(--fg)} #st2 .acctset select{font-size:11px;padding:1px 3px} #st2 .sync input{width:100%;font:11.5px var(--mono)} #st2 .sync .row{display:flex;gap:6px;flex-wrap:wrap}
 #st2 .sync code{font-size:11px;color:var(--fg)}
 #st2 .rules{flex-basis:100%;display:grid;grid-template-columns:auto auto auto;gap:5px 10px;align-items:center;font-size:11.5px;color:var(--mut)}
 #st2 .rules .rh{grid-column:1/-1;color:var(--fg);font-size:12px}
@@ -184,6 +184,11 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
         <input id="syncurl" placeholder="Dán URL ứng dụng web Google Apps Script (…/exec)" spellcheck="false" autocomplete="off">
         <div style="display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;font-size:11.5px;color:var(--fg)"><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgA" checked> Báo Telegram + "ting" cho kèo đang test:</label>
           <label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgEF" checked> E/F</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgD"> D</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgG" checked> G</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgH1"> A chuẩn (kèo lọc)</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgBTC"> chỉ BTC</label></div>
+        <div class="acctset"><b>Tài khoản giả định</b> <label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="acctOn" checked> bật</label>
+          · vốn <select data-r="acctStart"><option value="50">50$</option><option value="100">100$</option><option value="200">200$</option><option value="500">500$</option><option value="1000">1000$</option></select>
+          · rủi ro <select data-r="acctMode"><option value="pct">% tài khoản</option><option value="fix">cố định $</option></select> <select data-r="acctVal"><option value="0.5">0,5</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="5">5</option></select>
+          · đòn bẩy tối đa <select data-r="levMax"><option value="5">5x</option><option value="10">10x</option><option value="20">20x</option><option value="50">50x</option></select>
+          <button id="acctreset" type="button">Bắt đầu lại</button></div>
         <div class="row"><button id="syncsave">Lưu & đồng bộ</button><button id="syncnow">Đồng bộ ngay</button><button id="csvin">Nhập CSV</button><input type="file" id="csvfile" accept=".csv,text/csv" hidden></div>
         <details class="note"><summary>Cách tạo Google Sheet để lưu (làm 1 lần, ~3 phút)</summary>
           1. Tạo một Google Sheet mới → menu <b>Tiện ích mở rộng → Apps Script</b>.<br>
@@ -200,6 +205,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
       <div class="fbar" id="stfbar" hidden></div>
       <div class="kpi" id="stkpi"></div>
       <div class="setups" id="stsetup"></div>
+      <div class="h1 acct" id="stacct"></div>
       <div class="h1" id="sth2"></div>
       <div class="h1" id="sth4"></div>
       <div class="h1" id="sth3"></div>
@@ -475,7 +481,7 @@ function features(dir){
     raw:{...(t60?{xh60_pct:t60.pct}:{}),xh10_pct:+(dir*tr/m0*100).toFixed(3), cvd60_usd:Math.round(dir*cvd*m0), so_lech:+(dir*imb).toFixed(3), kl_x:+volX.toFixed(2), gio_utc:uh,
          spread_bps:+((last.ask-last.bid)/m0*1e4).toFixed(2), bien_dong5_pct:+(recentRange(300)/m0*100).toFixed(3)}};
 }
-const RULE_DEF={efTP:0.75,efTStop:10,tgBTC:false,tgEF:true,tgD:false,tgG:true,tgH1:false,onG:true,gMul:2,gMin:0,gRR:1,tgA:true,aH1:false,onA:true,onB:true,onC:true,onD:false,onE:true,onF:true,absMin:0,restMin:0,brkMin:0,brkAge:15,pullMin:0,pullAge:15,liqMinD:500000};
+const RULE_DEF={acctOn:true,acctStart:100,acctMode:"pct",acctVal:2,levMax:20,efTP:0.75,efTStop:10,tgBTC:false,tgEF:true,tgD:false,tgG:true,tgH1:false,onG:true,gMul:2,gMin:0,gRR:1,tgA:true,aH1:false,onA:true,onB:true,onC:true,onD:false,onE:true,onF:true,absMin:0,restMin:0,brkMin:0,brkAge:15,pullMin:0,pullAge:15,liqMinD:500000};
 let RULE={...RULE_DEF}, RULE_SAVED=null; try{ RULE_SAVED=JSON.parse(localStorage.getItem("bm_rules")||"null"); Object.assign(RULE,RULE_SAVED||{}); }catch(e){}
 if(RULE_SAVED&&(RULE_SAVED.v||0)<2||!RULE_SAVED){ RULE.onD=false; RULE.tgD=false; RULE.v=2; try{ localStorage.setItem("bm_rules",JSON.stringify(RULE)); }catch(e){} }   // 15/11: D lỗ rõ (64 lệnh, −0,57R) → tắt
 // trả về lý do không vào lệnh, hoặc "" nếu đạt
@@ -527,6 +533,21 @@ function checkPending(bid,ask){ const now=Date.now();
     if(now>q.exp){ S.pend=S.pend.filter(x=>x!==q); continue; }
     if((q.dir>0&&ask>=q.trg)||(q.dir<0&&bid<=q.trg)){ S.pend=S.pend.filter(x=>x!==q);
       openSignal(q.setup,q.dir,q.trg,q.why+" (đã xác nhận)",RULE.efTP,{...q.info,riskAbs:2*q.r0,r0:q.r0,hold:1800000,tstop:RULE.efTStop*60000,v4:true}); } } }
+
+// ---------- tài khoản giả định: tính khối lượng, đòn bẩy, lãi/lỗ USD cho các lệnh được báo (kèo đang test) ----------
+function acctT0(){ let t=+(localStorage.getItem("bm_acct_t0")||0); if(!t){ t=Date.now(); try{localStorage.setItem("bm_acct_t0",String(t));}catch(e){} } return t; }
+function acctTrades(){ const t0=acctT0(); return S.sigClosed.filter(o=>o.acct&&o.pnl!=null&&o.t>=t0).sort((a,b)=>(a.tx||a.t)-(b.tx||b.t)); }
+function acctBal(){ return RULE.acctStart+acctTrades().reduce((a,o)=>a+o.pnl,0); }
+const qtyStep=(sym,px)=>/^(BTC|ETH)USDT$/.test(sym)?0.001:px>=100?0.01:px>=1?0.1:px>=0.01?1:100;
+const minNotional=sym=>sym==="BTCUSDT"?50:sym==="ETHUSDT"?20:5;
+function acctSize(o){ const bal=acctBal(), want=RULE.acctMode==="pct"?bal*RULE.acctVal/100:RULE.acctVal;
+  const step=qtyStep(o.sym,o.entry); let qty=Math.floor(want/o.risk/step)*step;
+  const maxQty=Math.floor(bal*RULE.levMax/o.entry/step)*step; let note="";
+  if(qty>maxQty){ qty=maxQty; note=`đã giảm theo đòn bẩy tối đa ${RULE.levMax}x`; }
+  qty=+qty.toFixed(6); const notional=qty*o.entry;
+  if(!qty||notional<minNotional(o.sym)) note=`dưới mức tối thiểu của sàn (${minNotional(o.sym)}$)`;
+  return {bal:+bal.toFixed(2),riskUsd:+(qty*o.risk).toFixed(2),want:+want.toFixed(2),qty,notional:+notional.toFixed(2),lev:+(notional/bal).toFixed(1),note}; }
+const usd=v=>(v<0?"−":"")+"$"+Math.abs(v).toFixed(2);
 function openSignal(setup,dir,ref,why,rr=2,info={}){
   if(!S.auto||S.bestBid==null||!S.bucket) return "";
   const F0=features(dir); info.f=F0&&F0.b;
@@ -540,6 +561,7 @@ function openSignal(setup,dir,ref,why,rr=2,info={}){
   const risk=Math.abs(px-sl); if(risk>px*(info.riskAbs?0.024:0.012)) return " · không vào lệnh: SL quá xa";           // SL quá xa thì bỏ
   const tp=px+dir*rr*risk;
   const o={id:Date.now()+Math.random(),t:Date.now(),chk:Date.now(),mkt:S.mkt,sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open",...(F0?{f:F0.b,raw:F0.raw}:{}),sz:info.sz||0,rest:info.rest,age:info.age,...(info.hold?{hold:info.hold}:{}),...(info.r0?{r0:info.r0}:{}),...(info.tstop?{tstop:info.tstop}:{}),...(info.v4?{v4:true}:{})};
+  if(RULE.acctOn&&isWatch(o)&&sym!=="DEMO") o.acct=acctSize(o);
   S.sigOpen.push(o); saveSigs(); try{ tgOpen(o); }catch(e){}
   addEvent("sig",px,`Lệnh giấy ${SETUP[setup]}: ${dir>0?"MUA":"BÁN"} @ ${fp(px)} · SL ${fp(sl)} · TP ${fp(tp)}`,isWatch(o)?"keo":false);
   renderStats();
@@ -549,6 +571,7 @@ function closeSignal(o,exit,how){
   o.exit=exit; o.tx=Date.now(); o.how=how; o.status="closed";
   o.R=+((o.dir*(exit-o.entry)-o.fee*o.entry)/o.risk).toFixed(3);
   trackEx(o,o.dir*(exit-o.entry)/o.risk,o.tx);
+  if(o.acct) o.pnl=+(o.R*o.acct.riskUsd).toFixed(2);          // lãi/lỗ USD (đã trừ phí) theo khối lượng tài khoản giả định
   S.sigOpen=S.sigOpen.filter(x=>x!==o); S.sigClosed.push(o); saveSigs(); archiveTrade(o); try{ tgClose(o); }catch(e){}
   if(o.sym===(S.mkt==="demo"?"DEMO":S.sym)) addEvent(o.R>0?"win":"loss",exit,`Lệnh giấy ${SETUP[o.setup]} ${o.dir>0?"MUA":"BÁN"} đóng ${how} @ ${fp(exit)} · ${o.R>0?"+":""}${o.R.toFixed(2)}R`,false);
   renderStats();
@@ -689,6 +712,12 @@ function renderStats(){
       <div class="sz"><div class="h">Độ dày tường</div><div class="h r">Lệnh</div><div class="h r">Thắng</div><div class="h r">R/lệnh</div>${rowsz}</div>
       <div class="h1p"><i style="width:${Math.min(100,a5.n/40*100)}%"></i></div>
       <div class="ft">Cần ~40 lệnh mới (đang ${a5.n}). Bảng độ dày cho biết tường dày cỡ nào thì giá hay bật nhất — chỉnh ngưỡng ở ⚙ → G.</div>`; }
+  { const T=acctTrades(), b=acctBal(); let pk=RULE.acctStart, run=RULE.acctStart, dd=0; for(const o of T){ run+=o.pnl; pk=Math.max(pk,run); dd=Math.max(dd,(pk-run)/pk); }
+    const w=T.filter(o=>o.pnl>0), l=T.filter(o=>o.pnl<=0), opA=S.sigOpen.filter(o=>o.acct).length, ch=(b/RULE.acctStart-1)*100;
+    D.getElementById("stacct").hidden=!RULE.acctOn;
+    D.getElementById("stacct").innerHTML=`<div class="h1t"><b>Tài khoản giả định ${RULE.acctStart}$</b><span class="mut">Rủi ro ${RULE.acctMode==="pct"?RULE.acctVal+"% số dư":"$"+RULE.acctVal} mỗi lệnh · chỉ tính lệnh được báo Telegram · từ ${new Date(acctT0()).toLocaleString("vi-VN",{hour12:false,day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</span></div>
+      <div class="h1g"><div><span>Số dư</span><b class="${cls(ch)}">${usd(b)} (${ch>=0?"+":""}${ch.toFixed(1)}%)</b></div><div><span>Lệnh · thắng · sụt lớn nhất</span><b>${T.length} · ${T.length?Math.round(w.length/T.length*100):0}% · ${(dd*100).toFixed(1)}%</b></div></div>
+      <div class="h1g"><div><span>TB lệnh thắng / thua</span><b>${w.length?"+"+usd(w.reduce((a,o)=>a+o.pnl,0)/w.length):"–"} / ${l.length?usd(l.reduce((a,o)=>a+o.pnl,0)/l.length):"–"}</b></div><div><span>Đang mở</span><b>${opA}</b></div></div>`; }
   // lệnh đang mở
   D.getElementById("stopenh").innerHTML=`<span>Đang mở (${opens.length})</span>${opens.length?`<span class="${cls(plR)}">${sgn(plR)}R</span>`:""}`;
   let oh="";
@@ -696,7 +725,7 @@ function renderStats(){
     const prog=p?(p.R>=0?Math.min(1,p.R/(Math.abs(o.tp-o.entry)/o.risk)):Math.min(1,-p.R)):0;
     oh+=`<div class="oc ${p?(up?"up":"dn"):""}"><div class="l1"><b style="display:flex;align-items:center">${o.setup} · ${o.dir>0?'<span class="pos">MUA</span>':'<span class="neg">BÁN</span>'}${all?" "+o.sym.replace(/USDT$/,""):""}${o.f?`<span class="chips">${FILT.filter(([k])=>o.f[k]).map(([k,,sh])=>`<span>${sh}</span>`).join("")}</span>`:""}</b><span class="big ${p?cls(p.R):""}">${p?sgn(p.R)+"R":"…"}</span></div>
       <div class="l2"><span>${fp(o.entry)} → ${p?fp(p.px):"…"}${p&&p.src==="1m"?' <span class="mut">(1m)</span>':""}</span><span class="${p?cls(p.pct):""}">${p?sgn(p.pct)+"%":""}</span></div>
-      <div class="l3"><span>SL ${fp(o.sl)}</span><span class="plbar"><i class="${up?"pos":"neg"}" style="width:${Math.round(prog*100)}%"></i></span><span>TP ${fp(o.tp)}</span><span>⏱ ${p?mmss(p.left):""}</span></div></div>`; }
+      <div class="l3"><span>SL ${fp(o.sl)}</span><span class="plbar"><i class="${up?"pos":"neg"}" style="width:${Math.round(prog*100)}%"></i></span><span>TP ${fp(o.tp)}</span><span>⏱ ${p?mmss(p.left):""}</span></div>${o.acct?`<div class="l3"><span>${o.acct.qty} · ~$${Math.round(o.acct.notional)} · ${o.acct.lev}x · rủi ro ${usd(o.acct.riskUsd)}</span><span class="${p?cls(p.R):""}">${p?(p.R*o.acct.riskUsd>=0?"+":"")+usd(p.R*o.acct.riskUsd):""}</span></div>`:""}</div>`; }
   const otherOpen=S.sigOpen.length-opens.length;
   D.getElementById("stopen").innerHTML=oh||`<div class="empty2">Không có lệnh đang mở${otherOpen?` ở ${sym} — có ${otherOpen} lệnh mở ở mã khác, chọn <b>Tất cả mã</b> để xem`:""}.</div>`;
   // lệnh đã đóng
@@ -1065,9 +1094,11 @@ const fpx=(v,ref)=>{ const d=ref>=1000?1:ref>=10?2:ref>=1?3:6; return (+v).toLoc
 // tên kèo hiện trong tin Telegram
 const keoName=o=>"Kèo "+o.setup;   // ngắn gọn: Kèo A, Kèo E, Kèo F, Kèo D, Kèo G
 function tgOpen(o){ if(!isWatch(o)) return; const c=o.sym.replace(/USDT$/,"");
-  tgNotify(o.id+":o",`[${keoName(o)}]\n${o.dir>0?"🟢 <b>MUA":"🔴 <b>BÁN"} ${c}</b>\nVào: ${fpx(o.entry,o.entry)}\nSL: ${fpx(o.sl,o.entry)}\nTP: ${fpx(o.tp,o.entry)}`); }
+  const a=o.acct, sz=a?(a.note&&!a.qty?`\n⚠️ ${a.note}`:`\nKhối lượng: ${a.qty} ${c} (~$${Math.round(a.notional)}) · đòn bẩy ${a.lev}x\nRủi ro: ${usd(a.riskUsd)} (TK ${usd(a.bal)})${a.note?`\n⚠️ ${a.note}`:""}`):"";
+  tgNotify(o.id+":o",`[${keoName(o)}]\n${o.dir>0?"🟢 <b>MUA":"🔴 <b>BÁN"} ${c}</b>\nVào: ${fpx(o.entry,o.entry)}\nSL: ${fpx(o.sl,o.entry)}\nTP: ${fpx(o.tp,o.entry)}${sz}`); }
 function tgClose(o){ if(!isWatch(o)) return; const c=o.sym.replace(/USDT$/,""), h=/TP/.test(o.how)?"chạm TP":/SL/.test(o.how)?"chạm SL":/thoát sớm/.test(o.how)?`thoát sớm (sau ${Math.round((o.tstop||0)/60000)} phút chưa có lời)`:`hết ${Math.round((o.hold||1800000)/60000)} phút`;
-  tgNotify(o.id+":c",`${o.R>0?"✅":"❌"} ${h} (${o.R>0?"+":""}${o.R.toFixed(2)}R)`,o.id+":o"); }
+  const m=o.pnl!=null?` · ${o.pnl>=0?"+":""}${usd(o.pnl)} · TK ${usd(acctBal())}`:"";
+  tgNotify(o.id+":c",`${o.R>0?"✅":"❌"} ${h} (${o.R>0?"+":""}${o.R.toFixed(2)}R)${m}`,o.id+":o"); }
 function parseCSV(t){ const rows=[]; let row=[], f="", q=false;
   for(let i=0;i<t.length;i++){ const c=t[i];
     if(q){ if(c==='"'){ if(t[i+1]==='"'){ f+='"'; i++; } else q=false; } else f+=c; }
@@ -1152,6 +1183,7 @@ $("statbtn").onclick=()=>{ if(S.statWin&&!S.statWin.closed){ S.statWin.focus(); 
 $("stpop").onclick=()=>{ if(!openStatsWindow()) toast("Trình duyệt đang chặn cửa sổ bật lên. Cho phép ở thanh địa chỉ rồi bấm lại."); };
 
 $("stfset").onchange=()=>renderStats();
+$("acctreset").onclick=()=>{ try{ localStorage.setItem("bm_acct_t0",String(Date.now())); }catch(e){} renderStats(); toast(`Tài khoản giả định bắt đầu lại từ ${RULE.acctStart}$`); };
 $("syncurl").value=SYNC.url;
 $("syncsave").onclick=()=>{ const u=$("syncurl").value.trim(); if(u&&!/^https:\/\/script\.google(usercontent)?\.com\//.test(u)){ toast("URL phải bắt đầu bằng https://script.google.com/…/exec"); return; }
   SYNC.url=u; try{ u?localStorage.setItem("bm_sync",u):localStorage.removeItem("bm_sync"); }catch(e){} if(u) syncAll(true); else { synStatus("đã tắt đồng bộ"); toast("Đã tắt đồng bộ Google Sheet"); } };
@@ -1163,7 +1195,7 @@ $("gscopy").onclick=async()=>{ try{ await navigator.clipboard.writeText(GS_CODE)
   catch(e){ const w=window.open("","_blank"); if(w){ w.document.body.innerText=GS_CODE; } else toast("Không sao chép được — mở file apps_script.gs trong repo GitHub"); } };
 document.querySelectorAll("#strules [data-r],#stsync [data-r]").forEach(el=>{ const k=el.dataset.r;
   if(el.type==="checkbox") el.checked=!!RULE[k]; else el.value=String(RULE[k]);
-  el.onchange=()=>{ RULE[k]=el.type==="checkbox"?el.checked:+el.value; try{localStorage.setItem("bm_rules",JSON.stringify(RULE));}catch(e){} toast("Đã lưu điều kiện vào lệnh — áp dụng cho lệnh mới"); }; });
+  el.onchange=()=>{ RULE[k]=el.type==="checkbox"?el.checked:(isNaN(+el.value)?el.value:+el.value); try{localStorage.setItem("bm_rules",JSON.stringify(RULE));}catch(e){} toast("Đã lưu điều kiện vào lệnh — áp dụng cho lệnh mới"); }; });
 $("stcfg").onclick=()=>{ const D=SD(), c=D.getElementById("stcfgp"); c.hidden=!c.hidden; D.getElementById("stcfg").classList.toggle("on",!c.hidden); };
 $("stx").onclick=()=>{ if(S.statWin&&!S.statWin.closed){ S.statWin.close(); return; } document.getElementById("st2").hidden=true; $("statbtn").classList.remove("on"); };
 $("stsym").onchange=()=>{ renderStats(); toast(document.getElementById("stsym").value==="all"?"Đang xem tất cả các mã":"Đang xem mã hiện tại"); };
