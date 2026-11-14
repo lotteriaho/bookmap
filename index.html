@@ -944,9 +944,10 @@ const syncedIds=()=>{ try{ return new Set(JSON.parse(localStorage.getItem("bm_sy
 const saveSynced=set=>{ try{ localStorage.setItem("bm_synced",JSON.stringify([...set].slice(-20000))); }catch(e){} };
 function synStatus(t,c){ const D=SD(), el=D.getElementById("synst"); if(el){ el.textContent=t; el.className=c||"mut"; } }
 // gộp lệnh lấy từ nơi khác (Sheet, CSV, kho IndexedDB) vào bộ nhớ, bỏ lệnh trước lúc bấm "Xóa dữ liệu"
-function importTrades(list){ let ct=0; try{ ct=+(localStorage.getItem("bm_clearT")||0); }catch(e){}
-  const have=new Set(S.sigClosed.map(o=>String(o.id))); let n=0;
-  for(const o of list){ if(!o||o.id==null||o.R==null||(o.t||0)<ct||have.has(String(o.id))) continue; have.add(String(o.id)); o.status="closed"; S.sigClosed.push(o); n++; }
+// Sheet / CSV là bản lưu chính: nhập lại thì luôn khôi phục, kể cả lệnh trước lần bấm "Xóa dữ liệu" trên máy này
+function importTrades(list){ const have=new Set(S.sigClosed.map(o=>String(o.id))); let n=0;
+  if(list.some(o=>o&&o.id!=null&&!have.has(String(o.id)))) try{ localStorage.removeItem("bm_clearT"); }catch(e){}
+  for(const o of list){ if(!o||o.id==null||o.R==null||have.has(String(o.id))) continue; have.add(String(o.id)); o.status="closed"; S.sigClosed.push(o); n++; }
   if(n){ saveSigs(); for(const o of list) archiveTrade(o); renderStats(); } return n; }
 async function syncPull(){ if(!SYNC.url) return 0;
   const r=await fetch(SYNC.url,{cache:"no-store",redirect:"follow"}); const j=await r.json(); if(!j.ok) throw new Error("Sheet trả lỗi");
@@ -1072,7 +1073,7 @@ $("stx").onclick=()=>{ if(S.statWin&&!S.statWin.closed){ S.statWin.close(); retu
 $("stsym").onchange=()=>{ renderStats(); toast(document.getElementById("stsym").value==="all"?"Đang xem tất cả các mã":"Đang xem mã hiện tại"); };
 $("fee").onchange=e=>{S.fee=+e.target.value; toast("Phí mới áp dụng cho các lệnh giấy mở từ bây giờ");};
 $("clr").onclick=e=>{ const btn=e.currentTarget; if(btn.dataset.c!=="1"){ btn.dataset.c="1"; btn.textContent="Bấm lần nữa để xóa"; toast("Bấm \"Bấm lần nữa để xóa\" trong 4 giây để xóa hết lệnh giấy"); setTimeout(()=>{btn.dataset.c="";btn.textContent="Xóa dữ liệu";},4000); return; }
-  const n=S.sigClosed.length; try{ localStorage.setItem("bm_clearT",String(Date.now()+1)); localStorage.setItem("bm_sigs","[]"); localStorage.setItem("bm_sigopen","[]"); }catch(e){} clearArchive(); S.sigClosed=[]; S.sigOpen=[]; saveSigs(); btn.dataset.c=""; btn.textContent="Xóa dữ liệu"; renderStats(); toast(`Đã xóa ${n} lệnh giấy`); };
+  const n=S.sigClosed.length; try{ localStorage.setItem("bm_clearT",String(Date.now()+1)); localStorage.setItem("bm_sigs","[]"); localStorage.setItem("bm_sigopen","[]"); }catch(e){} clearArchive(); S.sigClosed=[]; S.sigOpen=[]; saveSigs(); btn.dataset.c=""; btn.textContent="Xóa dữ liệu"; renderStats(); toast(SYNC.url?`Đã xóa ${n} lệnh trên máy này — lệnh trên Google Sheet vẫn còn và sẽ nạp lại; muốn xóa hẳn thì xóa trong Sheet hoặc bỏ URL đồng bộ`:`Đã xóa ${n} lệnh giấy`); };
 $("csv").onclick=async()=>{ const all=await allTrades(); if(!all.length){ toast("Chưa có lệnh giấy nào đã đóng để xuất"); return; }
   const RAW=["xh10_pct","cvd60_usd","so_lech","kl_x","gio_utc","spread_bps","bien_dong5_pct"];
   const head=["id","gio_vao","gio_ra","giu_giay","san","ma","setup","huong","vao","sl","tp","rui_ro","thoat","cach_dong","R","phi","ly_do","do_lon_usd","tuong_dung_usd","tuong_dung_giay","mfe_R","giay_toi_mfe","mae_R","giay_toi_mae",...FILT.map(f=>"dk_"+f[0]),...RAW];
