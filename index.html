@@ -170,8 +170,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
         <label><input type="checkbox" data-r="onC" checked><b>C · Rút tường</b></label>
         <span>Tường ≥ <select data-r="pullMin"><option value="0">Tự động</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="2000000">2 tr</option><option value="3000000">3 tr</option><option value="5000000">5 tr</option><option value="10000000">10 tr</option></select></span>
         <span>Đứng ≥ <select data-r="pullAge"><option value="15">15 s</option><option value="30">30 s</option><option value="60">60 s</option><option value="120">2 phút</option></select></span>
-        <label><input type="checkbox" data-r="onE" checked><b>E · Bẫy phá tường</b></label><span class="mut" style="grid-column:2/-1">ngược B · dùng ngưỡng tường của B · SL ×2, TP 1,5R, 60 phút</span>
-        <label><input type="checkbox" data-r="onF" checked><b>F · Bẫy rút tường</b></label><span class="mut" style="grid-column:2/-1">ngược C · dùng ngưỡng tường của C · SL ×2, TP 1,5R, 60 phút</span>
+        <label><input type="checkbox" data-r="onE" checked><b>E · Bẫy phá tường</b></label><span class="mut" style="grid-column:2/-1">ngược B · chờ xác nhận 0,25×SL gốc trong 120 s · SL 2×SL gốc, TP 1:1, 30 phút</span>
+        <label><input type="checkbox" data-r="onF" checked><b>F · Bẫy rút tường</b></label><span class="mut" style="grid-column:2/-1">ngược C · chờ xác nhận 0,25×SL gốc trong 120 s · SL 2×SL gốc, TP 1:1, 30 phút</span>
         <label><input type="checkbox" data-r="onD" checked><b>D · Sau thanh lý</b></label>
         <span>Cụm thanh lý ≥ <select data-r="liqMinD"><option value="250000">250k</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="3000000">3 tr</option><option value="10000000">10 tr</option></select></span><span></span>
       </div>
@@ -277,7 +277,7 @@ function snapshotColumn(t){
   const col={n:S.colN++,t,keys,qs,bid:S.bestBid,ask:S.bestAsk,trades:S.cur?S.cur.trades:new Map(),buy:S.cur?S.cur.buy:0,sell:S.cur?S.cur.sell:0,liq:S.cur?S.cur.liq:[],cvd:S.cvd};
   S.cols.push(col); if(S.cols.length>S.maxCols) S.cols.shift();
   S.cur={trades:new Map(),buy:0,sell:0,liq:[]};
-  checkSignals(S.bestBid,S.bestAsk); detectWalls(col,agg,mid); detectAbsorption(col); detectCascade();
+  checkSignals(S.bestBid,S.bestAsk); if(S.pend.length) checkPending(S.bestBid,S.bestAsk); detectWalls(col,agg,mid); detectAbsorption(col); detectCascade();
   if(S.center==null) S.center=mid;
   if(S.follow){const y=yOf(mid); if(y<mainH*0.25||y>mainH*0.75){S.center=mid;S.dirty=true;}}
   if(!S.dirty) drawNewColumn(col);
@@ -291,6 +291,7 @@ function onTrade(price,qty,sellAggr,t){
   const pe=S.profile.get(k)||{b:0,s:0}; if(sellAggr) pe.s+=qty; else pe.b+=qty; S.profile.set(k,pe);
   S.last=price;
   if(S.sigOpen.length) checkSignals(price,price);
+  if(S.pend.length) checkPending(price,price);
 }
 
 // ---------- detectors ----------
@@ -341,7 +342,8 @@ function detectWalls(col,agg,mid){
       if(w.ann){ const drop=w.peak-cur, traded=tradedSince(k,w.since);
         const info={sz:w.peak*p,age:Math.round(age)};
         // E/F: đánh NGƯỢC B/C (tường bị phá / bị rút thường là bẫy) — SL = 2 lần SL của B/C, TP 1,5R, giữ tối đa 60 phút
-        const fade=(st,why)=>openSignal(st,w.side==="bid"?1:-1,p,why,1.5,{...info,fade:2,hold:3600000});
+        // E/F (bản 2): chờ XÁC NHẬN bẫy — giá phải quay ngược thêm 0,25×SL gốc trong 120 giây mới vào; SL = 2×SL gốc, TP 1:1, tối đa 30 phút
+        const fade=(st,why)=>queueFade(st,w.side==="bid"?1:-1,p,why,info);
         if(traded>=drop*0.5){ const r=openSignal("B",w.side==="bid"?-1:1,p,"phá tường",2,info)+fade("E","bẫy phá tường"); addEvent("brk",p,`Tường ${w.side==="bid"?"mua":"bán"} ${fmtQ(w.peak)} ${coin()} (${fusd(w.peak*p)}, đứng ${Math.round(age)} s) @ ${fp(p)} bị ăn hết (khớp ${fusd(traded*p)})${r}`,true); }
         else if(dist<=20){ const r=openSignal("C",w.side==="bid"?-1:1,p,"rút tường",2,info)+fade("F","bẫy rút tường"); addEvent("pull",p,`Rút tường ${w.side==="bid"?"mua":"bán"} ${fmtQ(w.peak)} ${coin()} (${fusd(w.peak*p)}, đứng ${Math.round(age)} s) @ ${fp(p)} khi giá cách ${fp(dist*B)} (nghi lệnh giả)${r}`,true); } }
       S.walls.delete(k); }
@@ -470,10 +472,28 @@ const nActive=()=>FILT.filter(f=>ACT[f[0]]).length+(ACT._set?1:0)+(ACT._sym?1:0)
 // Giả thuyết H1 (tìm ra từ dữ liệu 14/11): A + BTC/ETH + sổ nghiêng cùng chiều + ngược xu hướng 10 phút
 const isH1=o=>o.setup==="A"&&(o.sym==="BTCUSDT"||o.sym==="ETHUSDT")&&!!o.f&&o.f.book&&!o.f.trend;
 // Kèo 2 (tìm ra 14/11 tối bằng mô phỏng lại 110 lệnh trên giá 1 giây): đánh ngược B/C
-const isK2=o=>o.setup==="E"||o.setup==="F";
+const isK2=o=>(o.setup==="E"||o.setup==="F")&&o.r0!=null;   // chỉ tính bản 2 (có xác nhận)
 const isWatch=o=>isH1(o)||isK2(o);
-let K2T=0; try{ K2T=+(localStorage.getItem("bm_k2")||0); if(!K2T){ K2T=Date.now(); localStorage.setItem("bm_k2",String(K2T)); } }catch(e){ K2T=Date.now(); }
+let K2T=0; try{ K2T=+(localStorage.getItem("bm_k2b")||0); if(!K2T){ K2T=Date.now(); localStorage.setItem("bm_k2b",String(K2T)); } }catch(e){ K2T=Date.now(); }
 let H1T=0; try{ H1T=+(localStorage.getItem("bm_h1")||0); if(!H1T){ H1T=Date.now(); localStorage.setItem("bm_h1",String(H1T)); } }catch(e){ H1T=Date.now(); }
+// SL mà một lệnh hướng dir vào ở px sẽ dùng khi mốc là ref (giống B/C gốc)
+function baseRisk(dir,ref,px){ const B=S.bucket, minRisk=Math.max(4*B,0.5*recentRange(60),px*S.fee*3);
+  const sl=dir>0?Math.min(ref-2*B,px-minRisk):Math.max(ref+2*B,px+minRisk); return Math.abs(px-sl); }
+S.pend=[];
+function queueFade(setup,dir,ref,why,info){
+  if(!S.auto||S.bestBid==null||!S.bucket) return "";
+  const sym=S.mkt==="demo"?"DEMO":S.sym;
+  const bad=ruleFail(setup,{...info,f:null}); if(bad) return " · "+setup+": "+bad;
+  if(S.sigOpen.some(o=>o.setup===setup&&o.sym===sym)||S.pend.some(q=>q.setup===setup)) return "";
+  const px0=dir>0?S.bestBid:S.bestAsk, r0=baseRisk(-dir,ref,px0);          // SL gốc của lệnh B/C (hướng ngược lại)
+  const trg=px0+dir*0.25*r0;
+  S.pend.push({setup,dir,sym,trg,r0,why,info,exp:Date.now()+120000});
+  return ` · ${setup}: chờ giá ${dir>0?"lên":"xuống"} tới ${fp(trg)} trong 120 s để vào ${dir>0?"MUA":"BÁN"}`; }
+function checkPending(bid,ask){ const now=Date.now();
+  for(const q of [...S.pend]){
+    if(now>q.exp){ S.pend=S.pend.filter(x=>x!==q); continue; }
+    if((q.dir>0&&ask>=q.trg)||(q.dir<0&&bid<=q.trg)){ S.pend=S.pend.filter(x=>x!==q);
+      openSignal(q.setup,q.dir,q.trg,q.why+" (đã xác nhận)",1,{...q.info,riskAbs:2*q.r0,r0:q.r0,hold:1800000}); } } }
 function openSignal(setup,dir,ref,why,rr=2,info={}){
   if(!S.auto||S.bestBid==null||!S.bucket) return "";
   const F0=features(dir); info.f=F0&&F0.b;
@@ -483,11 +503,10 @@ function openSignal(setup,dir,ref,why,rr=2,info={}){
   const B=S.bucket, px=dir>0?S.bestAsk:S.bestBid;
   const minRisk=Math.max(4*B, 0.5*recentRange(60), px*S.fee*3);
   let sl=dir>0?Math.min(ref-2*B,px-minRisk):Math.max(ref+2*B,px+minRisk);
-  if(info.fade){ const d0=-dir, sl0=d0>0?Math.min(ref-2*B,px-minRisk):Math.max(ref+2*B,px+minRisk);   // SL mà lệnh B/C gốc sẽ dùng
-    sl=px-dir*info.fade*Math.abs(px-sl0); }
-  const risk=Math.abs(px-sl); if(risk>px*(info.fade?0.024:0.012)) return " · không vào lệnh: SL quá xa";           // SL quá xa thì bỏ
+  if(info.riskAbs) sl=px-dir*info.riskAbs;
+  const risk=Math.abs(px-sl); if(risk>px*(info.riskAbs?0.024:0.012)) return " · không vào lệnh: SL quá xa";           // SL quá xa thì bỏ
   const tp=px+dir*rr*risk;
-  const o={id:Date.now()+Math.random(),t:Date.now(),chk:Date.now(),mkt:S.mkt,sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open",...(F0?{f:F0.b,raw:F0.raw}:{}),sz:info.sz||0,rest:info.rest,age:info.age,...(info.hold?{hold:info.hold}:{})};
+  const o={id:Date.now()+Math.random(),t:Date.now(),chk:Date.now(),mkt:S.mkt,sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open",...(F0?{f:F0.b,raw:F0.raw}:{}),sz:info.sz||0,rest:info.rest,age:info.age,...(info.hold?{hold:info.hold}:{}),...(info.r0?{r0:info.r0}:{})};
   S.sigOpen.push(o); saveSigs(); try{ tgOpen(o); }catch(e){}
   addEvent("sig",px,`Lệnh giấy ${SETUP[setup]}: ${dir>0?"MUA":"BÁN"} @ ${fp(px)} · SL ${fp(sl)} · TP ${fp(tp)}`,true);
   renderStats();
@@ -608,13 +627,13 @@ function renderStats(){
     <div class="ft">${ok?'<span class="pos">✔ Đạt: ≥ 30 lệnh mới, thắng ≥ 55%, ≥ +0,3R/lệnh → đủ cơ sở thử bot testnet.</span>':bad?'<span class="neg">✘ Không đạt trên dữ liệu mới → kèo này có thể chỉ là may rủi.</span>':`Cần ~${need} lệnh mới (đang ${A1.n}). Đạt khi thắng ≥ 55% và ≥ +0,3R/lệnh (nên đặt phí 0,08%).`}</div>
     <button id="h1view">Xem các lệnh kèo này</button>`;
   D.getElementById("h1view").onclick=()=>{ ACT={_set:"A",_sym:"BTCUSDT,ETHUSDT",book:true,trend:"no"}; try{localStorage.setItem("bm_filt",JSON.stringify(ACT));}catch(e){} D.getElementById("stsym").value="all"; renderStats(); toast("Đang lọc theo kèo A chuẩn — bấm Bỏ lọc để xem lại tất cả"); };
-  { const all3=S.sigClosed.filter(isK2), a3=st(all3.filter(o=>o.t>=K2T)), need2=40, ok2=a3.n>=30&&a3.wr>=0.5&&a3.avg>=0.15, bad2=a3.n>=30&&!ok2;
+  { const all3=S.sigClosed.filter(isK2), a3=st(all3.filter(o=>o.t>=K2T)), need2=40, ok2=a3.n>=30&&a3.wr>=0.6&&a3.avg>=0.15, bad2=a3.n>=30&&!ok2;
     const opE=S.sigOpen.filter(isK2).length;
-    D.getElementById("sth2").innerHTML=`<div class="h1t"><b>Kèo thử nghiệm 2: Bẫy tường (E + F)</b><span class="mut">Tường bị phá / bị rút → đánh ngược · SL ×2 · TP 1,5R · tối đa 60 phút · mọi mã</span></div>
+    D.getElementById("sth2").innerHTML=`<div class="h1t"><b>Kèo thử nghiệm 2: Bẫy tường (E + F)</b><span class="mut">Tường bị phá / bị rút → chờ giá quay đầu xác nhận → đánh ngược · TP = SL (1:1) · tối đa 30 phút</span></div>
       <div class="h1g"><div><span>Dữ liệu mới (từ ${new Date(K2T).toLocaleString("vi-VN",{hour12:false,day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})})</span><b class="${a3.n?cls(a3.avg):""}">${a3.n?`${a3.n} lệnh · ${Math.round(a3.wr*100)}% · ${sgn(a3.avg)}R`:"chưa có lệnh"}${opE?` <span class="tag">${opE} mở</span>`:""}</b></div>
-      <div><span>Mô phỏng lại 53 lệnh B/C cũ</span><b class="mut">57% · +0,21R (phí 0,08%)</b></div></div>
+      <div><span>Mô phỏng lại trên 38 lệnh B/C cũ</span><b class="mut">74% · +0,32R (phí 0,08%)</b></div></div>
       <div class="h1p"><i style="width:${Math.min(100,a3.n/need2*100)}%"></i></div>
-      <div class="ft">${ok2?'<span class="pos">✔ Đạt: ≥ 30 lệnh mới, thắng ≥ 50%, ≥ +0,15R/lệnh.</span>':bad2?'<span class="neg">✘ Không đạt trên dữ liệu mới.</span>':`Cần ~${need2} lệnh mới (đang ${a3.n}). Đạt khi thắng ≥ 50% và ≥ +0,15R/lệnh.`}</div>
+      <div class="ft">${ok2?'<span class="pos">✔ Đạt: ≥ 30 lệnh mới, thắng ≥ 60%, ≥ +0,15R/lệnh.</span>':bad2?'<span class="neg">✘ Không đạt trên dữ liệu mới.</span>':`Cần ~${need2} lệnh mới (đang ${a3.n}). Đạt khi thắng ≥ 60% và ≥ +0,15R/lệnh.`}</div>
       <button id="h2view">Xem các lệnh kèo này</button>`;
     D.getElementById("h2view").onclick=()=>{ ACT={}; D.getElementById("stfset").value=""; try{localStorage.setItem("bm_filt","{}");}catch(e){} D.getElementById("stsym").value="all"; renderStats(); toast("Bảng setup: xem dòng E và F"); }; }
   // lệnh đang mở
