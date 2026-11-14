@@ -11,10 +11,11 @@
  * Sau khi thêm, chạy hàm thuTelegram() một lần (nút ▶ Chạy) để cấp quyền và thử gửi.
  */
 const SHEET_NAME = 'lenh_giay';
+const SHEET_ID = '';   // để trống nếu tạo Apps Script từ menu của Sheet; nếu tạo dự án riêng thì dán ID của Sheet vào đây
 const HEAD = ['id', 'json', 'gio_vao', 'ma', 'setup', 'huong', 'vao', 'thoat', 'cach_dong', 'R'];
 
 function sheet_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = SHEET_ID ? SpreadsheetApp.openById(SHEET_ID) : SpreadsheetApp.getActiveSpreadsheet();
   let sh = ss.getSheetByName(SHEET_NAME);
   if (!sh) { sh = ss.insertSheet(SHEET_NAME); sh.appendRow(HEAD); sh.setFrozenRows(1); sh.hideColumns(2); }
   return sh;
