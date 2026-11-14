@@ -58,23 +58,29 @@ function doGet() {
   return out_({ ok: true, trades });
 }
 
-function tg_(text) {
+// gửi tin; replyTo = message_id của tin cần trả lời (tin báo vào lệnh) → tin đóng lệnh hiện dạng trả lời
+function tg_(text, replyTo) {
   const p = PropertiesService.getScriptProperties(), tok = p.getProperty('TG_TOKEN'), chat = p.getProperty('TG_CHAT');
-  if (!tok || !chat) return 'chưa cài TG_TOKEN / TG_CHAT';
-  const r = UrlFetchApp.fetch('https://api.telegram.org/bot' + tok + '/sendMessage', { method: 'post', muteHttpExceptions: true,
-    payload: { chat_id: chat, text: String(text).slice(0, 3500), parse_mode: 'HTML', disable_web_page_preview: 'true' } });
-  return r.getResponseCode() === 200 ? 'ok' : 'Telegram lỗi ' + r.getResponseCode();
+  if (!tok || !chat) return { res: 'chưa cài TG_TOKEN / TG_CHAT' };
+  const payload = { chat_id: chat, text: String(text).slice(0, 3500), parse_mode: 'HTML', disable_web_page_preview: 'true' };
+  if (replyTo) payload.reply_parameters = JSON.stringify({ message_id: Number(replyTo), allow_sending_without_reply: true });
+  const r = UrlFetchApp.fetch('https://api.telegram.org/bot' + tok + '/sendMessage', { method: 'post', muteHttpExceptions: true, payload });
+  if (r.getResponseCode() !== 200) return { res: 'Telegram lỗi ' + r.getResponseCode() };
+  let mid = null; try { mid = JSON.parse(r.getContentText()).result.message_id; } catch (e) {}
+  return { res: 'ok', mid };
 }
-function thuTelegram() { Logger.log(tg_('✅ Bookmap mini: đã nối Telegram qua Google Sheet')); }
+function thuTelegram() { Logger.log(tg_('✅ Bookmap mini: đã nối Telegram qua Google Sheet').res); }
 
 // Trang Bookmap gửi POST: {trades:[…]} để lưu lệnh, {tg:{key,text}} để báo Telegram (trùng key thì bỏ qua)
 function doPost(e) {
   const body0 = JSON.parse(e.postData.contents || '{}');
   if (body0.tg) {
-    const c = CacheService.getScriptCache(), k = 'tg_' + String(body0.tg.key || '').slice(0, 200);
-    if (body0.tg.key && c.get(k)) return out_({ ok: true, tg: 'trùng, bỏ qua' });
-    const res = tg_(body0.tg.text || ''); if (body0.tg.key && res === 'ok') c.put(k, '1', 21600);
-    return out_({ ok: res === 'ok', tg: res });
+    const c = CacheService.getScriptCache(), key = String(body0.tg.key || '').slice(0, 200), k = 'tg_' + key;
+    if (key && c.get(k)) return out_({ ok: true, tg: 'trùng, bỏ qua' });
+    const replyTo = body0.tg.reply ? c.get('mid_' + String(body0.tg.reply).slice(0, 200)) : null;
+    const r = tg_(body0.tg.text || '', replyTo);
+    if (key && r.res === 'ok') { c.put(k, '1', 21600); if (r.mid) c.put('mid_' + key, String(r.mid), 21600); }   // nhớ message_id 6 giờ để tin đóng lệnh trả lời vào
+    return out_({ ok: r.res === 'ok', tg: r.res });
   }
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
