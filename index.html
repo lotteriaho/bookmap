@@ -95,6 +95,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 #st2 .flt .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #st2 .flt .ft{grid-column:1/-1;color:var(--mut);font-size:11px;line-height:1.4;margin-top:4px}
 #st2 .fbadge{color:#f4b43a}
+#st2 .fbar{display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(244,180,58,.12);border:1px solid rgba(244,180,58,.5);color:#f4b43a;border-radius:8px;padding:6px 8px;font-size:12px}
+#st2 .fbar button{font-size:11px;padding:3px 8px}
 #st2 .chips{display:flex;gap:3px;flex-wrap:wrap;margin-left:6px} #st2 .chips span{font-size:9.5px;padding:0 4px;border-radius:3px;background:rgba(34,197,139,.14);color:var(--buy)}
 #st2 .empty2{color:var(--mut);font-size:12px;padding:4px 0}
 #help{position:absolute;right:160px;top:10px;z-index:4;max-width:360px;background:rgba(17,23,34,.92);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--mut)}
@@ -141,10 +143,10 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
         <span>Hấp thụ ≥ <select data-r="absMin"><option value="0">Tự động</option><option value="250000">250k</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="2000000">2 tr</option><option value="5000000">5 tr</option></select></span>
         <span>Tường đứng tại mức ≥ <select data-r="restMin"><option value="0">Không cần</option><option value="250000">250k</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="3000000">3 tr</option></select></span>
         <label><input type="checkbox" data-r="onB" checked><b>B · Phá tường</b></label>
-        <span>Tường ≥ <select data-r="brkMin"><option value="0">Tự động</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="2000000">2 tr</option><option value="5000000">5 tr</option><option value="10000000">10 tr</option></select></span>
+        <span>Tường ≥ <select data-r="brkMin"><option value="0">Tự động</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="2000000">2 tr</option><option value="3000000">3 tr</option><option value="5000000">5 tr</option><option value="10000000">10 tr</option></select></span>
         <span>Đứng ≥ <select data-r="brkAge"><option value="15">15 s</option><option value="30">30 s</option><option value="60">60 s</option><option value="120">2 phút</option></select></span>
         <label><input type="checkbox" data-r="onC" checked><b>C · Rút tường</b></label>
-        <span>Tường ≥ <select data-r="pullMin"><option value="0">Tự động</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="2000000">2 tr</option><option value="5000000">5 tr</option><option value="10000000">10 tr</option></select></span>
+        <span>Tường ≥ <select data-r="pullMin"><option value="0">Tự động</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="2000000">2 tr</option><option value="3000000">3 tr</option><option value="5000000">5 tr</option><option value="10000000">10 tr</option></select></span>
         <span>Đứng ≥ <select data-r="pullAge"><option value="15">15 s</option><option value="30">30 s</option><option value="60">60 s</option><option value="120">2 phút</option></select></span>
         <label><input type="checkbox" data-r="onD" checked><b>D · Sau thanh lý</b></label>
         <span>Cụm thanh lý ≥ <select data-r="liqMinD"><option value="250000">250k</option><option value="500000">500k</option><option value="1000000">1 tr</option><option value="3000000">3 tr</option><option value="10000000">10 tr</option></select></span><span></span>
@@ -153,6 +155,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
       <b>A · Bật tường</b>: hấp thụ ■ → vào ngược lực đánh. <b>B · Phá tường</b>: tường bị ăn ⇡ → đi theo hướng phá. <b>C · Rút tường</b>: tường bị rút ✕ → đi theo hướng giá đang tới. <b>D · Sau thanh lý</b>: cụm thanh lý một phía đã dứt 30 giây → vào ngược lại.</details>
     </div>
     <div class="body">
+      <div class="fbar" id="stfbar" hidden></div>
       <div class="kpi" id="stkpi"></div>
       <div class="setups" id="stsetup"></div>
       <div class="sec"><span>Điều kiện lọc</span><select id="stfset" title="Xem theo setup"><option value="">Mọi setup</option><option>A</option><option>B</option><option>C</option><option>D</option></select></div>
@@ -435,6 +438,11 @@ function detectCascade(){
       const r=openSignal("D",side==="L"?1:-1,ext,`thanh lý ${side==="L"?"LONG":"SHORT"} ${fusd(usd)}`,1.5,{sz:usd});
       if(usd>=S.liqMin*10) addEvent(side==="L"?"liql":"liqs",ext,`Cụm thanh lý ${side==="L"?"LONG":"SHORT"} ${fusd(usd)} đã dứt 30 s${r||" → lệnh giấy D"}`,false); } }
 }
+// đưa bảng thống kê từ cửa sổ riêng về lại trang (khi cửa sổ đó bị đóng)
+function backPanel(){ const p=S.statPanel; if(!p) return; S.statPanel=null;
+  try{ document.getElementById("wrap").appendChild(document.adoptNode(p)); }catch(e){ try{ document.getElementById("wrap").appendChild(p); }catch(e2){} }
+  p.hidden=true; S.statWin=null; $("statbtn").textContent="📊 Thống kê"; $("statbtn").classList.remove("on"); }
+setInterval(()=>{ if(S.statPanel&&(!S.statWin||S.statWin.closed)) backPanel(); },700);
 const SD=()=>S.statWin&&!S.statWin.closed?S.statWin.document:document;
 function openStatsWindow(){
   const panel=document.getElementById("st2");
@@ -447,7 +455,8 @@ function openStatsWindow(){
     #st2{position:static!important;width:auto!important;max-width:none!important;max-height:none!important;height:100vh!important;border:0;border-radius:0}
     #st2{resize:none!important;box-shadow:none} .grip{cursor:default!important} #stpop{display:none}</style></head><body></body></html>`); w.document.close();
   w.document.body.appendChild(w.document.adoptNode(panel)); panel.hidden=false; panel.style.left=panel.style.top=""; S.statWin=w;
-  w.addEventListener("beforeunload",()=>{ try{ const p=w.document.getElementById("st2"); if(p){ document.getElementById("wrap").appendChild(document.adoptNode(p)); p.hidden=true; } }catch(e){} S.statWin=null; $("statbtn").textContent="📊 Thống kê"; });
+  S.statPanel=panel;
+  w.addEventListener("beforeunload",()=>{ backPanel(); });
   renderStats(); return true;
 }
 // lãi/lỗ tạm tính của lệnh đang mở: mã đang xem dùng giá bid/ask trực tiếp, mã khác dùng giá nến 1m gần nhất
@@ -476,6 +485,10 @@ function renderStats(){
   const A=st(rows), pls=opens.map(livePL).filter(Boolean), plR=pls.reduce((a,p)=>a+p.R,0);
   const kp=(lab,val,c="")=>`<div><span>${lab}</span><b class="${c}">${val}</b></div>`;
   D.getElementById("stkpi").classList.toggle("on",!!nAct);
+  const FB=D.getElementById("stfbar"); FB.hidden=!nAct;
+  if(nAct){ const untag=base.filter(o=>!o.f).length;
+    FB.innerHTML=`<span>Đang lọc ${nAct} điều kiện: chỉ tính ${rows.length}/${base.length} lệnh${untag?` (${untag} lệnh cũ chưa ghi điều kiện nên bị loại)`:""}</span><button id="stunf">Bỏ lọc</button>`;
+    D.getElementById("stunf").onclick=()=>{ ACT={}; try{localStorage.setItem("bm_filt","{}");}catch(e){} renderStats(); toast("Đã bỏ lọc — hiện lại toàn bộ lệnh"); }; }
   D.getElementById("stkpi").innerHTML=
     kp("Tổng R",A.n?sgn(A.tot,1):"–",cls(A.tot))+kp("Thắng",A.wr==null?"–":Math.round(A.wr*100)+"%")+kp("Số lệnh",A.n)+
     kp("R / lệnh",A.avg==null?"–":sgn(A.avg),cls(A.avg||0));
