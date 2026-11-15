@@ -130,11 +130,21 @@ def flat(sym):
             pass
     amt = position(sym)
     if amt == 0:
-        return None
-    od = req("POST", "/fapi/v1/order", {"symbol": sym, "side": "SELL" if amt > 0 else "BUY", "type": "MARKET",
+        return False                                   # sàn đã tự đóng (SL/TP trên sàn)
+    req("POST", "/fapi/v1/order", {"symbol": sym, "side": "SELL" if amt > 0 else "BUY", "type": "MARKET",
                                          "quantity": format(abs(amt), "f"), "reduceOnly": "true",
                                          "newOrderRespType": "RESULT"})
-    return float(od.get("avgPrice") or 0) or None
+    return True                                        # vị thế còn → Bookmap đóng bằng lệnh Market
+
+
+def fill_avg(sym, side, t0):
+    """Giá khớp trung bình thật từ lịch sử khớp (demo đôi khi trả avgPrice = 0)."""
+    for _ in range(3):
+        L = [x for x in req("GET", "/fapi/v1/userTrades", {"symbol": sym, "startTime": t0, "limit": 50}) if x["side"] == side]
+        if L:
+            return sum(float(x["price"]) * float(x["qty"]) for x in L) / sum(float(x["qty"]) for x in L)
+        time.sleep(0.7)
+    return None
 
 
 def do_open(b):
@@ -152,7 +162,12 @@ def do_open(b):
     t0 = int(time.time() * 1000) - 2000
     od = req("POST", "/fapi/v1/order", {"symbol": sym, "side": "BUY" if buy else "SELL", "type": "MARKET",
                                          "quantity": qty, "newOrderRespType": "RESULT"})
-    avg = float(od.get("avgPrice") or 0) or float(b["entry"])
+    avg = float(od.get("avgPrice") or 0)
+    if not avg:
+        try:
+            avg = fill_avg(sym, "BUY" if buy else "SELL", t0) or 0
+        except BinanceError:
+            avg = 0
     back = "SELL" if buy else "BUY"
     try:
         for typ, px in (("STOP_MARKET", b["sl"]), ("TAKE_PROFIT_MARKET", b["tp"])):
@@ -166,7 +181,8 @@ def do_open(b):
             pass
         return {"ok": False, "msg": f"không đặt được SL/TP nên đã đóng lại: {e}"}
     state["own"][sym] = {"key": b["key"], "t": t0, "side": "BUY" if buy else "SELL"}
-    return {"ok": True, "msg": f"khớp {qty} @ {avg:g}", "avg": avg, "qty": float(qty)}
+    return {"ok": True, "msg": f"khớp {qty} @ {avg:g}" if avg else f"khớp {qty} (chưa đọc được giá khớp)",
+            "avg": avg or None, "qty": float(qty)}
 
 
 def result(sym, own):
@@ -185,9 +201,9 @@ def do_close(b):
     own = state["own"].get(sym)
     if not isinstance(own, dict) or own.get("key") != b["key"]:
         return {"ok": True, "msg": "không phải vị thế của lệnh này"}
-    px = flat(sym)
+    by_us = flat(sym)
     state["own"].pop(sym, None)
-    r = {"ok": True, "by": "bookmap" if px else "san", "msg": f"đã đóng @ {px:g}" if px else "vị thế đã đóng bởi SL/TP trên sàn"}
+    r = {"ok": True, "by": "bookmap" if by_us else "san", "msg": "Bookmap đóng bằng lệnh Market" if by_us else "vị thế đã đóng bởi SL/TP trên sàn"}
     for _ in range(3):                                 # lệnh vừa khớp có thể chưa kịp vào lịch sử
         try:
             res = result(sym, own)
