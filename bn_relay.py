@@ -182,8 +182,14 @@ def do_open(b):
         except BinanceError:
             avg = 0
     back = "SELL" if buy else "BUY"
+    # Giá trên sàn demo chạy lệch giá Binance thật (có lúc vài chục–vài trăm USD), nên SL/TP đặt theo
+    # giá khớp demo, giữ nguyên khoảng cách như lệnh giấy; nếu không sẽ bị lỗi -2021 "would immediately trigger".
+    ref = avg or float(b["entry"])
+    d = 1 if buy else -1
+    sl_px = ref - d * abs(float(b["entry"]) - float(b["sl"]))
+    tp_px = ref + d * abs(float(b["tp"]) - float(b["entry"]))
     try:
-        for typ, px in (("STOP_MARKET", b["sl"]), ("TAKE_PROFIT_MARKET", b["tp"])):
+        for typ, px in (("STOP_MARKET", sl_px), ("TAKE_PROFIT_MARKET", tp_px)):
             req("POST", "/fapi/v1/algoOrder", {"algoType": "CONDITIONAL", "symbol": sym, "side": back, "type": typ,
                                                 "triggerPrice": rnd(float(px), inf["tick"]), "closePosition": "true",
                                                 "workingType": "CONTRACT_PRICE"})
