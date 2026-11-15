@@ -772,18 +772,6 @@ function drawOverlay(){
   for(const m of S.marks){ if(m.type==="liql"||m.type==="liqs"||m.type==="wall") continue; const x=mainW-(lastN-m.n+1)*cw+cw/2; if(x<0) continue;
     const y=yOf(m.price); if(y<0||y>mainH) continue; c.fillStyle="rgba(11,15,22,.75)"; c.fillRect(x-8,y-8,16,16); c.fillStyle=ICOL[m.type]; c.fillText(ICON[m.type],x,y+1); }
   c.textBaseline="alphabetic";
-  // lệnh giấy đang mở
-  { const sym=S.mkt==="demo"?"DEMO":S.sym; c.setLineDash([5,4]); c.lineWidth=1.2;
-    for(const o of S.sigOpen){ if(o.sym!==sym) continue;
-      for(const [v,col] of [[o.entry,"#4fc3f7"],[o.sl,"#ef5350"],[o.tp,"#22c58b"]]){ const y=yOf(v); if(y<0||y>mainH) continue;
-        c.strokeStyle=col; c.beginPath(); c.moveTo(0,y+0.5); c.lineTo(mainW,y+0.5); c.stroke(); }
-      const y=yOf(o.entry); if(y>=0&&y<=mainH){ c.setLineDash([]); c.font="bold 11px sans-serif"; c.textAlign="left";
-        const p=livePL(o), t=`${o.setup} ${o.dir>0?"MUA":"BÁN"} · TP ${fp(o.tp)} · SL ${fp(o.sl)}`, t2=p?` ${p.R>=0?"+":""}${p.R.toFixed(2)}R (${p.pct>=0?"+":""}${p.pct.toFixed(2)}%)${(o.hold||0)>=NOLIMIT?"":" · còn "+mmss(p.left)}`:"";
-        const w1=c.measureText(t).width, w2=c.measureText(t2).width, x=Math.max(4,mainW-130-w1-w2);
-        c.fillStyle="rgba(11,15,22,.8)"; c.fillRect(x-4,y-16,w1+w2+8,16);
-        c.fillStyle="#4fc3f7"; c.fillText(t,x,y-4); if(p){ c.fillStyle=p.R>=0?"#22c58b":"#ef5350"; c.fillText(t2,x+w1,y-4); }
-        c.setLineDash([5,4]); } }
-    c.setLineDash([]); }
   // active walls (labels at right edge of the heatmap)
   c.font="bold 11px "+getComputedStyle(document.body).getPropertyValue("--mono"); c.textAlign="right";
   const offUp=[], offDn=[];
@@ -829,6 +817,7 @@ function drawOverlay(){
     c.fillStyle="#9aa7bf"; c.fillText(fmt(p,Math.max(0,-Math.floor(Math.log10(step)))),rx+RIGHT/2-24,y-2);}
   // last price tag
   if(S.last!=null){const y=yOf(S.last); c.fillStyle="#f4b43a"; c.fillRect(rx,y-8,RIGHT,16); c.fillStyle="#0b0f16"; c.textAlign="center"; c.fillText(fp(S.last),rx+RIGHT/2,y+4);}
+  drawTrades(c,rx); drawHover(c,rx);
   // bottom: volume + CVD
   const bh=H-botY; c.fillStyle="#0d121b"; c.fillRect(0,botY,W,bh);
   c.strokeStyle="#223047"; c.beginPath(); c.moveTo(0,botY+0.5); c.lineTo(W,botY+0.5); c.stroke();
@@ -849,6 +838,49 @@ function drawOverlay(){
   c.fillStyle="#7d8aa3"; c.textAlign="left"; c.font="10px sans-serif"; c.fillText("Khối lượng mua/bán chủ động · CVD",6,botY+12);
 }
 
+// ---------- lệnh kèo T đang mở: vùng lời/lỗ + nhãn rõ ràng ----------
+const MONO=()=>getComputedStyle(document.body).getPropertyValue("--mono");
+function chip(c,x,y,text,bg,fg,used){   // nhãn có nền, tự né nhãn khác theo chiều dọc
+  c.font="bold 12px "+MONO(); const w=c.measureText(text).width+12, h=18;
+  let yy=y-h/2; for(let k=0;k<8;k++){ const hit=used.find(u=>x<u.x+u.w&&x+w>u.x&&yy<u.y+u.h&&yy+h>u.y); if(!hit) break; yy=hit.y+hit.h+2; }
+  used.push({x,y:yy,w,h}); c.fillStyle=bg; c.beginPath(); c.roundRect?c.roundRect(x,yy,w,h,4):c.rect(x,yy,w,h); c.fill();
+  c.fillStyle=fg; c.textAlign="left"; c.textBaseline="middle"; c.fillText(text,x+6,yy+h/2+1); c.textBaseline="alphabetic"; return w; }
+function axisTag(c,rx,y,text,bg){ if(y<0||y>mainH) return; c.font="bold 11px "+MONO(); c.fillStyle=bg; c.fillRect(rx,y-8,RIGHT,16);
+  c.fillStyle="#0b0f16"; c.textAlign="center"; c.fillText(text,rx+RIGHT/2,y+4); }
+function drawTrades(c,rx){
+  const sym=S.mkt==="demo"?"DEMO":S.sym, L=S.sigOpen.filter(o=>o.sym===sym&&isKT(o)); if(!L.length) return;
+  const used=[];
+  for(const o of L){
+    let i=S.cols.length-1; while(i>0&&S.cols[i-1].t>=o.t) i--;                 // cột lúc vào lệnh
+    const x0=Math.max(0,mainW-(S.cols.length-i)*cw), yE=yOf(o.entry), yT=yOf(o.tp), yS=yOf(o.sl), wz=mainW-x0;
+    // vùng lời (xanh) và vùng lỗ (đỏ)
+    c.fillStyle="rgba(34,197,139,.16)"; c.fillRect(x0,Math.min(yE,yT),wz,Math.abs(yT-yE));
+    c.fillStyle="rgba(239,83,80,.16)"; c.fillRect(x0,Math.min(yE,yS),wz,Math.abs(yS-yE));
+    for(const [y,col,w,dash] of [[yT,"#22c58b",2,[]],[yS,"#ef5350",2,[]],[yE,"#e8eef8",1.5,[6,4]]]){
+      c.setLineDash(dash); c.strokeStyle=col; c.lineWidth=w; c.beginPath(); c.moveTo(x0,Math.round(y)+0.5); c.lineTo(mainW,Math.round(y)+0.5); c.stroke(); }
+    c.setLineDash([]);
+    // nhãn ngay đầu lệnh
+    const p=livePL(o), up=p&&p.R>=0, lx=Math.min(x0+6,mainW-260);
+    chip(c,lx,yE,`T ${o.dir>0?"MUA":"BÁN"} ${fp(o.entry)}${p?`  ${p.R>=0?"+":""}${p.R.toFixed(2)}R  ${p.pct>=0?"+":""}${p.pct.toFixed(2)}%`:""}`,p?(up?"#1f9e70":"#c94440"):"#3a4a63","#fff",used);
+    chip(c,lx,yT,`TP ${fp(o.tp)}  +${((o.tp-o.entry)*o.dir/o.risk).toFixed(1)}R`,"#22c58b","#0b0f16",used);
+    chip(c,lx,yS,`SL ${fp(o.sl)}  −1R`,"#ef5350","#fff",used);
+    axisTag(c,rx,yT,"TP "+fp(o.tp),"#22c58b"); axisTag(c,rx,yS,"SL "+fp(o.sl),"#ef5350");
+  } }
+// ---------- rê chuột: đường gióng + giá, lệnh chờ, đã khớp, giờ tại điểm đó ----------
+function drawHover(c,rx){ const h=S.hover; if(!h||drag||h.x<0||h.x>=mainW||h.y<0||h.y>=mainH||!S.bucket) return;
+  const B=S.bucket, price=pOf(h.y), k=Math.floor(price/B);
+  c.setLineDash([4,4]); c.strokeStyle="rgba(232,238,248,.55)"; c.lineWidth=1;
+  c.beginPath(); c.moveTo(0,Math.round(h.y)+0.5); c.lineTo(mainW,Math.round(h.y)+0.5); c.moveTo(Math.round(h.x)+0.5,0); c.lineTo(Math.round(h.x)+0.5,mainH); c.stroke(); c.setLineDash([]);
+  axisTag(c,rx,h.y,fp(price),"#e8eef8");
+  const i=S.cols.length-Math.ceil((mainW-h.x)/cw), col=S.cols[i]; const lines=[`Giá ${fp(price)}`];
+  if(col){ const j=col.keys.indexOf(k), q=j>=0?col.qs[j]:0, mid=(col.bid+col.ask)/2;
+    lines.push(q>0?`Lệnh chờ ${(k+0.5)*B<mid?"mua":"bán"}: ${fusd(q*(k+0.5)*B)} (${fmtQ(q)} ${coin()})`:"Lệnh chờ: không đáng kể");
+    const T0=col.trades, tr=!T0?null:T0.get?T0.get(k):Array.isArray(T0)?((T0.find(x=>x[0]===k)||[])[1]):null; if(tr&&(tr.b+tr.s)>0) lines.push(`Đã khớp: mua ${fmtQ(tr.b)} · bán ${fmtQ(tr.s)} ${coin()}`);
+    lines.push(new Date(col.t).toLocaleTimeString("vi-VN",{hour12:false})); }
+  c.font="12px "+MONO(); const w=Math.max(...lines.map(t=>c.measureText(t).width))+16, hh=lines.length*17+8;
+  let tx=h.x+14, ty=h.y+14; if(tx+w>mainW) tx=h.x-14-w; if(ty+hh>mainH) ty=h.y-14-hh;
+  c.fillStyle="rgba(11,15,22,.92)"; c.fillRect(tx,ty,w,hh); c.strokeStyle="#3a4a63"; c.strokeRect(tx+0.5,ty+0.5,w-1,hh-1);
+  c.textAlign="left"; lines.forEach((t,n)=>{ c.fillStyle=n===0?"#f4b43a":"#d7e0ee"; c.fillText(t,tx+8,ty+20+n*17); }); }
 // ---------- render loop ----------
 let lastFrame=0;
 function frame(ts){
@@ -1256,6 +1288,8 @@ ov.addEventListener("pointermove",e=>{ if(!drag||S.center==null) return; const d
   if(Math.abs(dy)>3 && S.follow){S.follow=false;$("follow").classList.remove("on");}
   S.center=drag.c+dy/S.rowPx*S.bucket; S.dirty=true;});
 ov.addEventListener("pointerup",()=>{drag=null;});
+ov.addEventListener("pointermove",e=>{ const r=ov.getBoundingClientRect(); S.hover={x:e.clientX-r.left,y:e.clientY-r.top}; });
+ov.addEventListener("pointerleave",()=>{ S.hover=null; });
 
 // ---------- boot ----------
 resize(); loadSigs();
