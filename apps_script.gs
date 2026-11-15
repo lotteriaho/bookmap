@@ -127,6 +127,7 @@ function telegram_(u) {
   else if (cmd === '/start' || cmd === '/help') tg_('Lệnh: /history · /history 24h · /history 7d · /history BTC');
 }
 // chạy 1 lần sau khi triển khai phiên bản mới: trỏ bot Telegram về ứng dụng web này để nhận lệnh /history
+// ⚠ CHỈ dùng với bot riêng cho Bookmap. Nếu bot này cũng do EA/MT5 đọc lệnh (getUpdates) thì EA sẽ mất /signal, /report — khi đó chạy xoaWebhook().
 function caiHistory() {
   const p = PropertiesService.getScriptProperties(), tok = p.getProperty('TG_TOKEN');
   if (!tok) throw new Error('chưa cài TG_TOKEN');
@@ -168,4 +169,14 @@ function doPost(e) {
     if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, HEAD.length).setValues(rows);
     return out_({ ok: true, added: rows.length, updated: upd, total: at.size });
   } finally { lock.releaseLock(); }
+}
+
+// gỡ webhook: trả bot về chế độ getUpdates để EA trên MT5 nhận lại /signal, /report…
+function xoaWebhook() {
+  const tok = PropertiesService.getScriptProperties().getProperty('TG_TOKEN');
+  const r = UrlFetchApp.fetch('https://api.telegram.org/bot' + tok + '/deleteWebhook', { method: 'post', muteHttpExceptions: true, payload: { drop_pending_updates: 'false' } });
+  // đặt lại allowed_updates = mọi loại tin (không truyền offset nên không lấy mất tin của EA)
+  UrlFetchApp.fetch('https://api.telegram.org/bot' + tok + '/getUpdates?limit=1&timeout=0&allowed_updates=' + encodeURIComponent('[]'), { muteHttpExceptions: true });
+  const i = UrlFetchApp.fetch('https://api.telegram.org/bot' + tok + '/getWebhookInfo', { muteHttpExceptions: true });
+  Logger.log('deleteWebhook: ' + r.getContentText() + ' · info: ' + i.getContentText());
 }
