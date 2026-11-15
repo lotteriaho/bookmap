@@ -183,7 +183,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
         <div class="rh">Sao lưu lệnh giấy <span class="mut" id="synst"></span></div>
         <input id="syncurl" placeholder="Dán URL ứng dụng web Google Apps Script (…/exec)" spellcheck="false" autocomplete="off">
         <div style="display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;font-size:11.5px;color:var(--fg)"><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgA" checked> Báo Telegram + "ting" cho kèo đang test:</label>
-          <label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgEF" checked> E/F</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgD"> D</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgG" checked> G</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgH1"> A chuẩn (kèo lọc)</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgBTC"> chỉ BTC</label></div>
+          <label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgEF" checked> E/F</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgD"> D</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgG" checked> G</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgH1"> A chuẩn (kèo lọc)</label><label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="tgBTC"> chỉ BTC</label><label style="text-transform:none;letter-spacing:0" title="Kèo đang test sẽ vào lệnh thật trên tài khoản Binance DEMO (tiền ảo) qua Google Apps Script — cần BN_KEY / BN_SECRET trong Thuộc tính tập lệnh"><input type="checkbox" data-r="bnOn"> 🔗 Vào lệnh Binance demo</label></div>
         <div class="acctset"><b>Tài khoản giả định</b> <label style="text-transform:none;letter-spacing:0"><input type="checkbox" data-r="acctOn" checked> bật</label>
           · vốn <select data-r="acctStart"><option value="50">50$</option><option value="100">100$</option><option value="200">200$</option><option value="500">500$</option><option value="1000">1000$</option></select>
           · rủi ro <select data-r="acctMode"><option value="pct">% tài khoản</option><option value="fix">cố định $</option></select> <select data-r="acctVal"><option value="0.5">0,5</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="5">5</option></select>
@@ -481,7 +481,7 @@ function features(dir){
     raw:{...(t60?{xh60_pct:t60.pct}:{}),xh10_pct:+(dir*tr/m0*100).toFixed(3), cvd60_usd:Math.round(dir*cvd*m0), so_lech:+(dir*imb).toFixed(3), kl_x:+volX.toFixed(2), gio_utc:uh,
          spread_bps:+((last.ask-last.bid)/m0*1e4).toFixed(2), bien_dong5_pct:+(recentRange(300)/m0*100).toFixed(3)}};
 }
-const RULE_DEF={acctOn:true,acctStart:100,acctMode:"pct",acctVal:2,levMax:20,efTP:0.75,efTStop:10,tgBTC:false,tgEF:true,tgD:false,tgG:true,tgH1:false,onG:true,gMul:2,gMin:0,gRR:1,tgA:true,aH1:false,onA:true,onB:true,onC:true,onD:false,onE:true,onF:true,absMin:0,restMin:0,brkMin:0,brkAge:15,pullMin:0,pullAge:15,liqMinD:500000};
+const RULE_DEF={acctOn:true,acctStart:100,acctMode:"pct",acctVal:2,levMax:20,efTP:0.75,efTStop:10,tgBTC:false,bnOn:false,tgEF:true,tgD:false,tgG:true,tgH1:false,onG:true,gMul:2,gMin:0,gRR:1,tgA:true,aH1:false,onA:true,onB:true,onC:true,onD:false,onE:true,onF:true,absMin:0,restMin:0,brkMin:0,brkAge:15,pullMin:0,pullAge:15,liqMinD:500000};
 let RULE={...RULE_DEF}, RULE_SAVED=null; try{ RULE_SAVED=JSON.parse(localStorage.getItem("bm_rules")||"null"); Object.assign(RULE,RULE_SAVED||{}); }catch(e){}
 if(RULE_SAVED&&(RULE_SAVED.v||0)<2||!RULE_SAVED){ RULE.onD=false; RULE.tgD=false; RULE.v=2; try{ localStorage.setItem("bm_rules",JSON.stringify(RULE)); }catch(e){} }   // 15/11: D lỗ rõ (64 lệnh, −0,57R) → tắt
 // trả về lý do không vào lệnh, hoặc "" nếu đạt
@@ -563,7 +563,7 @@ function openSignal(setup,dir,ref,why,rr=2,info={}){
   const tp=px+dir*rr*risk;
   const o={id:Date.now()+Math.random(),t:Date.now(),chk:Date.now(),mkt:S.mkt,sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open",...(F0?{f:F0.b,raw:F0.raw}:{}),sz:info.sz||0,rest:info.rest,age:info.age,...(info.hold?{hold:info.hold}:{}),...(info.r0?{r0:info.r0}:{}),...(info.tstop?{tstop:info.tstop}:{}),...(info.v4?{v4:true}:{})};
   if(RULE.acctOn&&isWatch(o)&&sym!=="DEMO") o.acct=acctSize(o);
-  S.sigOpen.push(o); saveSigs(); try{ tgOpen(o); }catch(e){}
+  S.sigOpen.push(o); saveSigs(); try{ tgOpen(o); }catch(e){} try{ if(RULE.bnOn&&isWatch(o)&&o.acct&&o.acct.qty) bnSend("open",o); }catch(e){}
   addEvent("sig",px,`Lệnh giấy ${SETUP[setup]}: ${dir>0?"MUA":"BÁN"} @ ${fp(px)} · SL ${fp(sl)} · TP ${fp(tp)}`,isWatch(o)?"keo":false);
   renderStats();
   return "";
@@ -573,7 +573,7 @@ function closeSignal(o,exit,how){
   o.R=+((o.dir*(exit-o.entry)-o.fee*o.entry)/o.risk).toFixed(3);
   trackEx(o,o.dir*(exit-o.entry)/o.risk,o.tx);
   if(o.acct) o.pnl=+(o.R*o.acct.riskUsd).toFixed(2);          // lãi/lỗ USD (đã trừ phí) theo khối lượng tài khoản giả định
-  S.sigOpen=S.sigOpen.filter(x=>x!==o); S.sigClosed.push(o); saveSigs(); archiveTrade(o); try{ tgClose(o); }catch(e){}
+  S.sigOpen=S.sigOpen.filter(x=>x!==o); S.sigClosed.push(o); saveSigs(); archiveTrade(o); try{ tgClose(o); }catch(e){} try{ if(o.bn&&o.bn.ok) bnSend("close",o); }catch(e){}
   if(o.sym===(S.mkt==="demo"?"DEMO":S.sym)) addEvent(o.R>0?"win":"loss",exit,`Lệnh giấy ${SETUP[o.setup]} ${o.dir>0?"MUA":"BÁN"} đóng ${how} @ ${fp(exit)} · ${o.R>0?"+":""}${o.R.toFixed(2)}R`,false);
   renderStats();
 }
@@ -1099,6 +1099,17 @@ window.addEventListener("pagehide",()=>{ if(!SYNC.url) return; const sy=syncedId
 function tgNotify(key,text,reply){ if(!SYNC.url||!RULE.tgA) return;
   fetch(SYNC.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({tg:{key,text,reply}}),redirect:"follow"})
     .then(r=>r.json()).then(j=>{ if(!j.ok&&j.tg) synStatus("Telegram: "+j.tg,"neg"); }).catch(()=>{}); }
+// vào / đóng lệnh trên Binance Futures DEMO qua Apps Script (API key nằm trong Google của bạn, không ở trang này)
+const BN_URL="http://127.0.0.1:8787";   // chương trình bn_relay.py chạy trên máy bạn (giữ key, đặt lệnh lên demo-fapi)
+const bnPost=b=>fetch(BN_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}).then(r=>r.json());
+function bnPing(){ bnPost({act:"ping"}).then(j=>toast(j.ok?"🔗 "+j.msg:"🔗 Binance demo lỗi: "+j.msg)).catch(()=>toast("🔗 Chưa thấy bn_relay.py chạy trên máy (cửa sổ đen phải đang mở)")); }
+function bnSend(act,o){ const c=o.sym.replace(/USDT$/,"");
+  const body={act,key:o.id+":b",sym:o.sym,dir:o.dir,entry:o.entry,sl:o.sl,tp:o.tp,qty:o.acct&&o.acct.qty,lev:RULE.levMax};
+  bnPost(body).then(j=>{ if(j.dup) return;
+      if(act==="open"){ o.bn={ok:!!j.ok,msg:j.msg,avg:j.avg,qty:j.qty}; saveSigs(); renderStats(); toast(`Binance demo ${c}: ${j.msg}`);
+        tgNotify(o.id+":bo",`🔗 Binance demo: ${j.ok?"✅ ":"⚠️ "}${j.msg}`,o.id+":o"); }
+      else if(!j.ok){ toast(`Binance demo ${c} đóng lỗi: ${j.msg}`); tgNotify(o.id+":bc",`⚠️ Binance demo đóng lỗi: ${j.msg} — hãy đóng tay trên demo.binance.com`,o.id+":o"); } })
+    .catch(()=>{ toast(`Binance demo ${c}: chưa thấy bn_relay.py chạy trên máy`); if(act==="open") tgNotify(o.id+":bo","⚠️ Binance demo: bn_relay.py không chạy, lệnh không được đặt",o.id+":o"); }); }
 const fpx=(v,ref)=>{ const d=ref>=1000?1:ref>=10?2:ref>=1?3:6; return (+v).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d}); };
 // tên kèo hiện trong tin Telegram
 const keoName=o=>"Kèo "+o.setup;   // ngắn gọn: Kèo A, Kèo E, Kèo F, Kèo D, Kèo G
@@ -1204,7 +1215,7 @@ $("gscopy").onclick=async()=>{ try{ await navigator.clipboard.writeText(GS_CODE)
   catch(e){ const w=window.open("","_blank"); if(w){ w.document.body.innerText=GS_CODE; } else toast("Không sao chép được — mở file apps_script.gs trong repo GitHub"); } };
 document.querySelectorAll("#strules [data-r],#stsync [data-r]").forEach(el=>{ const k=el.dataset.r;
   if(el.type==="checkbox") el.checked=!!RULE[k]; else el.value=String(RULE[k]);
-  el.onchange=()=>{ RULE[k]=el.type==="checkbox"?el.checked:(isNaN(+el.value)?el.value:+el.value); try{localStorage.setItem("bm_rules",JSON.stringify(RULE));}catch(e){} toast("Đã lưu điều kiện vào lệnh — áp dụng cho lệnh mới"); }; });
+  el.onchange=()=>{ RULE[k]=el.type==="checkbox"?el.checked:(isNaN(+el.value)?el.value:+el.value); try{localStorage.setItem("bm_rules",JSON.stringify(RULE));}catch(e){} toast("Đã lưu điều kiện vào lệnh — áp dụng cho lệnh mới"); if(k==="bnOn"&&RULE.bnOn) setTimeout(bnPing,600); }; });
 $("stcfg").onclick=()=>{ const D=SD(), c=D.getElementById("stcfgp"); c.hidden=!c.hidden; D.getElementById("stcfg").classList.toggle("on",!c.hidden); };
 $("stx").onclick=()=>{ if(S.statWin&&!S.statWin.closed){ S.statWin.close(); return; } document.getElementById("st2").hidden=true; $("statbtn").classList.remove("on"); };
 $("stsym").onchange=()=>{ renderStats(); toast(document.getElementById("stsym").value==="all"?"Đang xem tất cả các mã":"Đang xem mã hiện tại"); };
