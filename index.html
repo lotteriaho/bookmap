@@ -168,7 +168,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
         <label><input type="checkbox" data-r="onT" checked><b>T · Bẫy tường + CVD</b></label><span class="mut" style="grid-column:2/-1">tường bị phá / bị rút nhưng giá quay ngược lại (đã xác nhận 0,25×SL gốc trong 120 s) · SL 2×SL gốc</span>
         <span style="grid-column:1/-1">CVD 60 s ngược hướng lệnh tối đa <select data-r="tCvd"><option value="500000">0,5 tr$</option><option value="1000000">1 tr$</option><option value="2000000">2 tr$</option><option value="3000000">3 tr$</option></select>
           · TP <select data-r="tTP"><option value="0.75">0,75R</option><option value="1">1R</option><option value="1.5">1,5R</option></select>
-          · thoát sớm nếu chưa có lời sau <select data-r="tTStop"><option value="0">không</option><option value="10">10 phút</option><option value="15">15 phút</option></select> · giữ tối đa 30 phút</span>
+          · thoát sớm nếu chưa có lời sau <select data-r="tTStop"><option value="0">không</option><option value="10">10 phút</option><option value="15">15 phút</option></select> · giữ <select data-r="tHold"><option value="0">đến khi chạm TP/SL</option><option value="30">tối đa 30 phút</option><option value="60">tối đa 60 phút</option></select></span>
         <span class="mut" style="grid-column:1/-1">Các kèo cũ A–G đã tắt (lỗ hoặc chưa ổn định trên 641 lệnh giấy 14–15/11); lịch sử của chúng vẫn nằm trong Google Sheet.</span>
       </div>
       <div class="sync" id="stsync">
@@ -473,11 +473,14 @@ function features(dir){
     raw:{...(t60?{xh60_pct:t60.pct}:{}),xh10_pct:+(dir*tr/m0*100).toFixed(3), cvd60_usd:Math.round(dir*cvd*m0), so_lech:+(dir*imb).toFixed(3), kl_x:+volX.toFixed(2), gio_utc:uh,
          spread_bps:+((last.ask-last.bid)/m0*1e4).toFixed(2), bien_dong5_pct:+(recentRange(300)/m0*100).toFixed(3)}};
 }
-const RULE_DEF={onT:true,tCvd:2000000,tTP:1,tTStop:0,tgT:true,acctOn:true,acctStart:100,acctMode:"pct",acctVal:2,levMax:20,efTP:0.75,efTStop:10,tgBTC:false,bnOn:false,tgEF:true,tgD:false,tgG:true,tgH1:false,onG:true,gMul:2,gMin:0,gRR:1,tgA:true,aH1:false,onA:true,onB:true,onC:true,onD:false,onE:true,onF:true,absMin:0,restMin:0,brkMin:0,brkAge:15,pullMin:0,pullAge:15,liqMinD:500000};
+const RULE_DEF={onT:true,tCvd:2000000,tTP:1,tTStop:0,tHold:0,tgT:true,acctOn:true,acctStart:100,acctMode:"pct",acctVal:2,levMax:20,efTP:0.75,efTStop:10,tgBTC:false,bnOn:false,tgEF:true,tgD:false,tgG:true,tgH1:false,onG:true,gMul:2,gMin:0,gRR:1,tgA:true,aH1:false,onA:true,onB:true,onC:true,onD:false,onE:true,onF:true,absMin:0,restMin:0,brkMin:0,brkAge:15,pullMin:0,pullAge:15,liqMinD:500000};
 let RULE={...RULE_DEF}, RULE_SAVED=null; try{ RULE_SAVED=JSON.parse(localStorage.getItem("bm_rules")||"null"); Object.assign(RULE,RULE_SAVED||{}); }catch(e){}
 if(RULE_SAVED&&(RULE_SAVED.v||0)<2||!RULE_SAVED){ RULE.onD=false; RULE.tgD=false; RULE.v=2; try{ localStorage.setItem("bm_rules",JSON.stringify(RULE)); }catch(e){} }
 // 15/11 tối: bỏ toàn bộ kèo cũ (A–G), chỉ còn kèo T = E/F đã xác nhận + CVD 60 s không ngược mạnh. E/F vẫn bật để PHÁT HIỆN bẫy, nhưng không tự tạo lệnh.
 if((RULE.v||0)<3){ Object.assign(RULE,{onA:false,onB:false,onC:false,onD:false,onG:false,onE:true,onF:true,tgEF:false,tgD:false,tgG:false,tgH1:false,onT:true,tgT:true,tCvd:2000000,tTP:1,tTStop:0,v:3}); try{ localStorage.setItem("bm_rules",JSON.stringify(RULE)); }catch(e){} }
+// 15/11 18:51: kèo T giữ đến khi chạm TP hoặc SL (không giới hạn thời gian), TP 1R — mô phỏng 44 lệnh: thắng 75%, +14,8R
+if((RULE.v||0)<4){ Object.assign(RULE,{tTP:1,tTStop:0,tHold:0,v:4}); try{ localStorage.setItem("bm_rules",JSON.stringify(RULE)); }catch(e){} }
+const NOLIMIT=30*864e5;   // "không giới hạn" = 30 ngày (chỉ để chặn lệnh treo vĩnh viễn)
 let KTT=0; try{ KTT=+(localStorage.getItem("bm_kT")||0); if(!KTT){ KTT=Date.now(); localStorage.setItem("bm_kT",String(KTT)); } }catch(e){ KTT=Date.now(); }   // 15/11: D lỗ rõ (64 lệnh, −0,57R) → tắt
 // trả về lý do không vào lệnh, hoặc "" nếu đạt
 function ruleFail(setup,info){
@@ -534,7 +537,7 @@ function checkPending(bid,ask){ const now=Date.now();
       if(!RULE.onT) continue;
       if(cvd==null){ addEvent("sig",q.trg,`Kèo T bỏ qua (${nm}): chưa đủ dữ liệu CVD`,false); continue; }
       if(cvd<-RULE.tCvd){ addEvent("sig",q.trg,`Kèo T bỏ qua (${nm} ${q.dir>0?"MUA":"BÁN"}): CVD 60 s ngược ${fusd(-cvd)} > ${fusd(RULE.tCvd)}`,false); continue; }
-      openSignal("T",q.dir,q.trg,nm+" + CVD "+(cvd>=0?"+":"−")+fusd(Math.abs(cvd)),RULE.tTP,{...q.info,riskAbs:2*q.r0,r0:q.r0,hold:1800000,tstop:RULE.tTStop*60000,v4:true,base:q.setup,cvd}); } } }
+      openSignal("T",q.dir,q.trg,nm+" + CVD "+(cvd>=0?"+":"−")+fusd(Math.abs(cvd)),RULE.tTP,{...q.info,riskAbs:2*q.r0,r0:q.r0,hold:RULE.tHold?RULE.tHold*60000:NOLIMIT,tstop:RULE.tTStop*60000,v4:true,base:q.setup,cvd}); } } }
 
 // ---------- tài khoản giả định: tính khối lượng, đòn bẩy, lãi/lỗ USD cho các lệnh được báo (kèo đang test) ----------
 function acctT0(){ let t=+(localStorage.getItem("bm_acct_t0")||0); if(!t){ t=Date.now(); try{localStorage.setItem("bm_acct_t0",String(t));}catch(e){} } return t; }
@@ -635,7 +638,7 @@ function openCells(o,f){ const p=livePL(o);
   if(!p) return `<td><span class="mut">đang mở</span></td><td><span class="mut">chờ giá…</span></td>`;
   const prog=p.R>=0?Math.min(1,p.R/((Math.abs(o.tp-o.entry))/o.risk)):Math.min(1,-p.R);   // tiến tới TP / tới SL
   const bar=`<span class="plbar"><i class="${p.R>=0?"pos":"neg"}" style="width:${Math.round(prog*100)}%"></i></span>`;
-  return `<td>${fp(p.px)}${p.src==="1m"?' <span class="mut">(1m)</span>':""}</td><td><b>${f(p.R)}R</b> ${f(p.pct,2)}% ${bar} <span class="mut">${p.R>=0?"tới TP":"tới SL"} · còn ${mmss(p.left)}</span></td>`; }
+  return `<td>${fp(p.px)}${p.src==="1m"?' <span class="mut">(1m)</span>':""}</td><td><b>${f(p.R)}R</b> ${f(p.pct,2)}% ${bar} <span class="mut">${p.R>=0?"tới TP":"tới SL"}${(o.hold||0)>=NOLIMIT?" · giữ đến TP/SL":" · còn "+mmss(p.left)}</span></td>`; }
 const mmss=ms=>{const s=Math.round(ms/1000); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");};
 function renderStats(){ try{ renderHist(); }catch(e){}
   const D=SD(), el=D.getElementById("st2"); if(!el||el.hidden) return;
@@ -727,7 +730,7 @@ function renderStats(){ try{ renderHist(); }catch(e){}
     const prog=p?(p.R>=0?Math.min(1,p.R/(Math.abs(o.tp-o.entry)/o.risk)):Math.min(1,-p.R)):0;
     oh+=`<div class="oc ${p?(up?"up":"dn"):""}"><div class="l1"><b style="display:flex;align-items:center">${o.setup} · ${o.dir>0?'<span class="pos">MUA</span>':'<span class="neg">BÁN</span>'}${all?" "+o.sym.replace(/USDT$/,""):""}${o.f?`<span class="chips">${FILT.filter(([k])=>o.f[k]).map(([k,,sh])=>`<span>${sh}</span>`).join("")}</span>`:""}</b><span class="big ${p?cls(p.R):""}">${p?sgn(p.R)+"R":"…"}</span></div>
       <div class="l2"><span>${fp(o.entry)} → ${p?fp(p.px):"…"}${p&&p.src==="1m"?' <span class="mut">(1m)</span>':""}</span><span class="${p?cls(p.pct):""}">${p?sgn(p.pct)+"%":""}</span></div>
-      <div class="l3"><span>SL ${fp(o.sl)}</span><span class="plbar"><i class="${up?"pos":"neg"}" style="width:${Math.round(prog*100)}%"></i></span><span>TP ${fp(o.tp)}</span><span>⏱ ${p?mmss(p.left):""}</span></div>${o.acct?`<div class="l3"><span>${o.acct.qty} · ~$${Math.round(o.acct.notional)} · ${o.acct.lev}x · rủi ro ${usd(o.acct.riskUsd)}</span><span class="${p?cls(p.R):""}">${p?(p.R*o.acct.riskUsd>=0?"+":"")+usd(p.R*o.acct.riskUsd):""}</span></div>`:""}</div>`; }
+      <div class="l3"><span>SL ${fp(o.sl)}</span><span class="plbar"><i class="${up?"pos":"neg"}" style="width:${Math.round(prog*100)}%"></i></span><span>TP ${fp(o.tp)}</span><span>⏱ ${p?((o.hold||0)>=NOLIMIT?"đến TP/SL":mmss(p.left)):""}</span></div>${o.acct?`<div class="l3"><span>${o.acct.qty} · ~$${Math.round(o.acct.notional)} · ${o.acct.lev}x · rủi ro ${usd(o.acct.riskUsd)}</span><span class="${p?cls(p.R):""}">${p?(p.R*o.acct.riskUsd>=0?"+":"")+usd(p.R*o.acct.riskUsd):""}</span></div>`:""}</div>`; }
   const otherOpen=S.sigOpen.length-opens.length;
   D.getElementById("stopen").innerHTML=oh||`<div class="empty2">Không có lệnh đang mở${otherOpen?` ở ${sym} — có ${otherOpen} lệnh mở ở mã khác, chọn <b>Tất cả mã</b> để xem`:""}.</div>`;
   // lệnh đã đóng
@@ -816,7 +819,7 @@ function drawOverlay(){
       for(const [v,col] of [[o.entry,"#4fc3f7"],[o.sl,"#ef5350"],[o.tp,"#22c58b"]]){ const y=yOf(v); if(y<0||y>mainH) continue;
         c.strokeStyle=col; c.beginPath(); c.moveTo(0,y+0.5); c.lineTo(mainW,y+0.5); c.stroke(); }
       const y=yOf(o.entry); if(y>=0&&y<=mainH){ c.setLineDash([]); c.font="bold 11px sans-serif"; c.textAlign="left";
-        const p=livePL(o), t=`${o.setup} ${o.dir>0?"MUA":"BÁN"} · TP ${fp(o.tp)} · SL ${fp(o.sl)}`, t2=p?` ${p.R>=0?"+":""}${p.R.toFixed(2)}R (${p.pct>=0?"+":""}${p.pct.toFixed(2)}%) · còn ${mmss(p.left)}`:"";
+        const p=livePL(o), t=`${o.setup} ${o.dir>0?"MUA":"BÁN"} · TP ${fp(o.tp)} · SL ${fp(o.sl)}`, t2=p?` ${p.R>=0?"+":""}${p.R.toFixed(2)}R (${p.pct>=0?"+":""}${p.pct.toFixed(2)}%)${(o.hold||0)>=NOLIMIT?"":" · còn "+mmss(p.left)}`:"";
         const w1=c.measureText(t).width, w2=c.measureText(t2).width, x=Math.max(4,mainW-130-w1-w2);
         c.fillStyle="rgba(11,15,22,.8)"; c.fillRect(x-4,y-16,w1+w2+8,16);
         c.fillStyle="#4fc3f7"; c.fillText(t,x,y-4); if(p){ c.fillStyle=p.R>=0?"#22c58b":"#ef5350"; c.fillText(t2,x+w1,y-4); }
