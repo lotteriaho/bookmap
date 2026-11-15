@@ -181,6 +181,8 @@ def handle(b):
     act, key = b.get("act"), str(b.get("key", ""))
     if act == "ping":
         bal = next((x["balance"] for x in req("GET", "/fapi/v3/balance") if x["asset"] == "USDT"), "?")
+        if b.get("from"):
+            log("Bookmap đã nối tới — sẵn sàng vào lệnh")
         return {"ok": True, "msg": f"Binance demo OK · số dư {float(bal):,.2f} USDT"}
     if act not in ("open", "close") or not key:
         return {"ok": False, "msg": "yêu cầu sai"}

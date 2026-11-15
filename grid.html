@@ -67,7 +67,7 @@ function build(){
   G.classList.remove("max"); G.style.gridTemplateColumns=`repeat(${c},minmax(0,1fr))`; G.style.gridTemplateRows=`repeat(${r},minmax(0,1fr))`;
   for(let i=0;i<6;i++){
     if(i<n&&!frames[i]){ const d=document.createElement("div"); d.className="cell"; const f=document.createElement("iframe");
-      f.src=src(i,st.syms[i]); f.title="Bookmap "+st.syms[i]; d.appendChild(f); frames[i]=d; }
+      f.allow="local-network-access *; local-network *; loopback-network *"; f.src=src(i,st.syms[i]); f.title="Bookmap "+st.syms[i]; d.appendChild(f); frames[i]=d; }
     if(frames[i]){ if(i<n){ if(frames[i].parentNode!==G) G.appendChild(frames[i]); frames[i].classList.remove("big"); }
       else { frames[i].remove(); frames[i]=null; } }   // ô bị bỏ: đóng hẳn để không chạy ngầm tạo lệnh
   }
