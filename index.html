@@ -169,7 +169,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
         <span style="grid-column:1/-1">CVD 60 s ngược hướng lệnh tối đa <select data-r="tCvd"><option value="500000">0,5 tr$</option><option value="1000000">1 tr$</option><option value="2000000">2 tr$</option><option value="3000000">3 tr$</option></select>
           · TP <select data-r="tTP"><option value="0.75">0,75R</option><option value="1">1R</option><option value="1.5">1,5R</option></select>
           · thoát sớm nếu chưa có lời sau <select data-r="tTStop"><option value="0">không</option><option value="10">10 phút</option><option value="15">15 phút</option></select> · giữ <select data-r="tHold"><option value="0">đến khi chạm TP/SL</option><option value="30">tối đa 30 phút</option><option value="60">tối đa 60 phút</option></select> · tối đa <select data-r="tMax"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select> lệnh mở cùng lúc mỗi mã</span>
-        <span class="mut" style="grid-column:1/-1">Các kèo cũ A–G đã tắt (lỗ hoặc chưa ổn định trên 641 lệnh giấy 14–15/11); lịch sử của chúng vẫn nằm trong Google Sheet.</span>
+        <span style="grid-column:1/-1">Thu dữ liệu (lệnh giấy, không báo Telegram, không demo, không tính tài khoản):
+          <label style="display:inline;text-transform:none;letter-spacing:0"><input type="checkbox" data-r="onA"> A</label> <label style="display:inline;text-transform:none;letter-spacing:0"><input type="checkbox" data-r="onB"> B</label> <label style="display:inline;text-transform:none;letter-spacing:0"><input type="checkbox" data-r="onC"> C</label> <label style="display:inline;text-transform:none;letter-spacing:0"><input type="checkbox" data-r="onD"> D</label> <label style="display:inline;text-transform:none;letter-spacing:0"><input type="checkbox" data-r="onE"> E</label> <label style="display:inline;text-transform:none;letter-spacing:0"><input type="checkbox" data-r="onF"> F</label> <label style="display:inline;text-transform:none;letter-spacing:0"><input type="checkbox" data-r="onG"> G</label>
+          <span class="mut">· E/F ở đây = mọi bẫy đã xác nhận, không lọc CVD, cùng TP/giữ lệnh như kèo T (để so sánh)</span></span>
       </div>
       <div class="sync" id="stsync">
         <div class="rh">Sao lưu lệnh giấy <span class="mut" id="synst"></span></div>
@@ -198,7 +200,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
       <div class="kpi" id="stkpi"></div>
       <div class="setups" id="stsetup"></div>
       <div class="h1 acct" id="stacct"></div>
-      <div class="sec"><span>Điều kiện lọc</span><select id="stfset" title="Xem theo setup"><option value="">Kèo T</option></select></div>
+      <div class="sec"><span>Điều kiện lọc</span><select id="stfset" title="Xem theo setup"><option value="">Kèo T</option><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option></select></div>
       <div class="flt" id="stflt"></div>
       <div class="sec" id="stopenh"></div><div id="stopen"></div>
       <div class="sec" id="stclh"></div><div id="stclosed"></div>
@@ -478,11 +480,13 @@ if((RULE.v||0)<3){ Object.assign(RULE,{onA:false,onB:false,onC:false,onD:false,o
 if((RULE.v||0)<4){ Object.assign(RULE,{tTP:1,tTStop:0,tHold:0,v:4}); try{ localStorage.setItem("bm_rules",JSON.stringify(RULE)); }catch(e){} }
 // 15/11 18:59: tối đa 2 lệnh kèo T mỗi mã — mô phỏng 43 lệnh: thắng 77%, +16,0R (1 lệnh/mã: 72%, +10,2R)
 if((RULE.v||0)<5){ Object.assign(RULE,{tMax:2,v:5}); try{ localStorage.setItem("bm_rules",JSON.stringify(RULE)); }catch(e){} }
+// 15/11 19:05: bật lại A–G chỉ để THU DỮ LIỆU (lệnh giấy, không Telegram, không demo, không tính tài khoản)
+if((RULE.v||0)<6){ Object.assign(RULE,{onA:true,onB:true,onC:true,onD:true,onE:true,onF:true,onG:true,v:6}); try{ localStorage.setItem("bm_rules",JSON.stringify(RULE)); }catch(e){} }
 const NOLIMIT=30*864e5;   // "không giới hạn" = 30 ngày (chỉ để chặn lệnh treo vĩnh viễn)
 let KTT=0; try{ KTT=+(localStorage.getItem("bm_kT")||0); if(!KTT){ KTT=Date.now(); localStorage.setItem("bm_kT",String(KTT)); } }catch(e){ KTT=Date.now(); }   // 15/11: D lỗ rõ (64 lệnh, −0,57R) → tắt
 // trả về lý do không vào lệnh, hoặc "" nếu đạt
 function ruleFail(setup,info){
-  if(!RULE["on"+setup]) return "đang tắt setup "+setup;
+  if(!RULE["on"+setup]&&!(info._detect&&(setup==="E"||setup==="F"))) return "đang tắt setup "+setup;
   if(setup==="A"&&RULE.aH1){ const f=info.f; if(!f||!f.book||f.trend) return "không đúng kèo A chuẩn"; }
   if(setup==="A"){ if(RULE.absMin&&info.sz<RULE.absMin) return "hấp thụ nhỏ"; if(RULE.restMin&&(info.rest||0)<RULE.restMin) return "không có tường đứng"; }
   if(setup==="B"){ if(RULE.brkMin&&info.sz<RULE.brkMin) return "tường nhỏ"; if((info.age||0)<RULE.brkAge) return "tường mới đứng"; }
@@ -508,7 +512,7 @@ window.addEventListener("online",()=>{ if(S.mkt!=="demo"&&Date.now()-S.lastMsgT>
 function queueFade(setup,dir,ref,why,info){
   if(!S.auto||S.bestBid==null||!S.bucket) return "";
   const sym=S.mkt==="demo"?"DEMO":S.sym;
-  const bad=ruleFail(setup,{...info,f:null}); if(bad) return " · "+setup+": "+bad;
+  const bad=ruleFail(setup,{...info,f:null,_detect:RULE.onT}); if(bad) return " · "+setup+": "+bad;
   if(S.sigOpen.some(o=>o.setup===setup&&o.sym===sym)||S.pend.some(q=>q.setup===setup)) return "";
   const px0=dir>0?S.bestBid:S.bestAsk, r0=baseRisk(-dir,ref,px0);          // SL gốc của lệnh B/C (hướng ngược lại)
   const trg=px0+dir*0.25*r0;
@@ -520,6 +524,8 @@ function checkPending(bid,ask){ const now=Date.now();
     if((q.dir>0&&ask>=q.trg)||(q.dir<0&&bid<=q.trg)){ S.pend=S.pend.filter(x=>x!==q);
       // Kèo T: bẫy đã xác nhận + CVD 60 s (lệnh chủ động, đã nhân theo hướng lệnh) không ngược quá ngưỡng
       const F0=features(q.dir), cvd=F0?F0.raw.cvd60_usd:null, nm=q.setup==="E"?"bẫy phá tường":"bẫy rút tường";
+      const exitT={...q.info,riskAbs:2*q.r0,r0:q.r0,hold:RULE.tHold?RULE.tHold*60000:NOLIMIT,tstop:RULE.tTStop*60000,v4:true};
+      if(RULE["on"+q.setup]) openSignal(q.setup,q.dir,q.trg,q.why+" (đã xác nhận)",RULE.tTP,exitT);   // lệnh giấy thu dữ liệu, không lọc CVD
       if(!RULE.onT) continue;
       if(cvd==null){ addEvent("sig",q.trg,`Kèo T bỏ qua (${nm}): chưa đủ dữ liệu CVD`,false); continue; }
       if(cvd<-RULE.tCvd){ addEvent("sig",q.trg,`Kèo T bỏ qua (${nm} ${q.dir>0?"MUA":"BÁN"}): CVD 60 s ngược ${fusd(-cvd)} > ${fusd(RULE.tCvd)}`,false); continue; }
@@ -647,12 +653,14 @@ function renderStats(){ try{ renderHist(); }catch(e){}
     kp("Tổng R",A.n?sgn(A.tot,1):"–",cls(A.tot))+kp("Thắng",A.wr==null?"–":Math.round(A.wr*100)+"%")+kp("Số lệnh",A.n)+
     kp("R / lệnh",A.avg==null?"–":sgn(A.avg),cls(A.avg||0));
   let h='<div class="h">Setup</div><div class="h r">Lệnh</div><div class="h r">Thắng</div><div class="h r">Tổng R</div>';
-  for(const k of ["T"]){ const a=st(rows.filter(o=>o.setup===k)), op=opens.filter(o=>o.setup===k).length;
+  const dataC=S.sigClosed.filter(o=>!isKT(o)&&o.t>=KTT&&(all||o.sym===sym)), dataO=S.sigOpen.filter(o=>!isKT(o)&&(all||o.sym===sym));
+  for(const k of ["T","A","B","C","D","E","F","G"]){ if(k==="A") h+='<div class="h" style="grid-column:1/-1;margin-top:4px">Thu dữ liệu · lệnh giấy, không báo (từ lúc bắt đầu kèo T)</div>';
+    const a=st(k==="T"?rows.filter(o=>o.setup===k):dataC.filter(o=>o.setup===k)), op=(k==="T"?opens:dataO).filter(o=>o.setup===k).length;
     const tip=a.n?`TB/lệnh ${sgn(a.avg)}R`:"Chưa có lệnh";
     h+=`<div class="nm" title="${tip}"><i>${k}</i>${SETUP[k].split("· ")[1]}${op?` <span class="tag">${op} mở</span>`:""}</div><div class="r">${a.n||'<span class="mut">0</span>'}</div><div class="r">${a.wr==null?'<span class="mut">–</span>':Math.round(a.wr*100)+"%"}</div><div class="r ${cls(a.tot)}">${a.n?sgn(a.tot,1):'<span class="mut">–</span>'}</div>`; }
   D.getElementById("stsetup").innerHTML=h;
   // bảng điều kiện lọc: so sánh lệnh ĐẠT và KHÔNG ĐẠT từng điều kiện
-  const fs=D.getElementById("stfset").value, fx=base.filter(o=>o.f&&(!fs||o.setup===fs));
+  const fs=D.getElementById("stfset").value, fx=(fs?S.sigClosed.filter(o=>o.setup===fs&&(all||o.sym===sym)):base).filter(o=>o.f);
   const cell=xs=>{ const a=st(xs); return a.n?`${a.n} · ${Math.round(a.wr*100)}% · <span class="${cls(a.avg)}">${sgn(a.avg)}</span>`:'<span class="mut">–</span>'; };
   let fh='<div class="h">Lọc</div><div class="h">Điều kiện</div><div class="h r">Đạt: lệnh·thắng·R</div><div class="h r">Không đạt</div>';
   for(const [k,name,,tip] of FILT){ const v=ACT[k], lab=v==="no"?"✗":v?"✓":"–";
