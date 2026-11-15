@@ -111,6 +111,19 @@ def sym_info(sym):
     return info_cache[sym]
 
 
+fee_cache = {}
+
+
+def taker_rate(sym):
+    """Phí taker thật của tài khoản cho mã này (Binance trả dạng 0.0005 = 0,05%)."""
+    if sym not in fee_cache:
+        try:
+            fee_cache[sym] = float(req("GET", "/fapi/v1/commissionRate", {"symbol": sym})["takerCommissionRate"])
+        except (BinanceError, KeyError, ValueError):
+            return None
+    return fee_cache[sym]
+
+
 def rnd(v, step, floor=False):
     from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
     st = Decimal(step).normalize()
@@ -182,7 +195,7 @@ def do_open(b):
         return {"ok": False, "msg": f"không đặt được SL/TP nên đã đóng lại: {e}"}
     state["own"][sym] = {"key": b["key"], "t": t0, "side": "BUY" if buy else "SELL"}
     return {"ok": True, "msg": f"khớp {qty} @ {avg:g}" if avg else f"khớp {qty} (chưa đọc được giá khớp)",
-            "avg": avg or None, "qty": float(qty)}
+            "avg": avg or None, "qty": float(qty), "rate": taker_rate(sym)}
 
 
 def result(sym, own):
@@ -224,7 +237,7 @@ def handle(b):
         bal = next((x["balance"] for x in req("GET", "/fapi/v3/balance") if x["asset"] == "USDT"), "?")
         if b.get("from"):
             log("Bookmap đã nối tới — sẵn sàng vào lệnh")
-        return {"ok": True, "msg": f"Binance demo OK · số dư {float(bal):,.2f} USDT"}
+        return {"ok": True, "msg": f"Binance demo OK · số dư {float(bal):,.2f} USDT", "rate": taker_rate("BTCUSDT")}
     if act not in ("open", "close") or not key:
         return {"ok": False, "msg": "yêu cầu sai"}
     dk = act + ":" + key
