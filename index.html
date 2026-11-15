@@ -563,7 +563,7 @@ function openSignal(setup,dir,ref,why,rr=2,info={}){
   const tp=px+dir*rr*risk;
   const o={id:Date.now()+Math.random(),t:Date.now(),chk:Date.now(),mkt:S.mkt,sym,setup,dir,entry:px,sl,tp,risk,why,fee:S.fee,status:"open",...(F0?{f:F0.b,raw:F0.raw}:{}),sz:info.sz||0,rest:info.rest,age:info.age,...(info.hold?{hold:info.hold}:{}),...(info.r0?{r0:info.r0}:{}),...(info.tstop?{tstop:info.tstop}:{}),...(info.v4?{v4:true}:{})};
   if(RULE.acctOn&&isWatch(o)&&sym!=="DEMO") o.acct=acctSize(o);
-  S.sigOpen.push(o); saveSigs(); try{ tgOpen(o); }catch(e){} try{ if(RULE.bnOn&&isWatch(o)&&o.acct&&o.acct.qty) bnSend("open",o); }catch(e){}
+  S.sigOpen.push(o); saveSigs(); try{ tgOpen(o); }catch(e){} try{ if(RULE.bnOn&&isWatch(o)){ if(o.acct&&o.acct.qty) bnSend("open",o); else bnFail(o,o.acct?(o.acct.note||"khối lượng = 0"):"chưa bật Tài khoản giả định"); } }catch(e){}
   addEvent("sig",px,`Lệnh giấy ${SETUP[setup]}: ${dir>0?"MUA":"BÁN"} @ ${fp(px)} · SL ${fp(sl)} · TP ${fp(tp)}`,isWatch(o)?"keo":false);
   renderStats();
   return "";
@@ -1105,20 +1105,33 @@ const bnPost=b=>fetch(BN_URL,{method:"POST",headers:{"Content-Type":"application
 function bnStatus(t,c){ for(const D of new Set([document,SD()])){ const el=D.getElementById("bnst"); if(el){ el.textContent=t; el.className=c||"mut"; } } }
 function bnPing(){ bnStatus("đang kiểm tra…"); bnPost({act:"ping",from:"page"}).then(j=>{ bnStatus(j.ok?"✓ "+j.msg:"✗ "+j.msg,j.ok?"pos":"neg"); toast(j.ok?"🔗 "+j.msg:"🔗 Binance demo lỗi: "+j.msg); })
   .catch(e=>{ bnStatus("✗ Không nối được bn_relay.py ("+(e.message||e)+"). Cửa sổ đen có đang mở? Chrome có chặn quyền mạng cục bộ không?","neg"); toast("🔗 Chưa thấy bn_relay.py chạy trên máy"); }); }
-function bnSend(act,o){ const c=o.sym.replace(/USDT$/,"");
+// Khi bật "Vào lệnh Binance demo": Telegram chỉ báo lệnh trên Binance demo (kèm giá vào của Bookmap để so), không báo lệnh giấy
+function bnFail(o,why){ const c=o.sym.replace(/USDT$/,"");
+  tgNotify(o.id+":o",`[${keoName(o)}] ⚠️ ${o.dir>0?"MUA":"BÁN"} ${c} — Binance demo không vào lệnh: ${why}`); }
+function bnSend(act,o){ const c=o.sym.replace(/USDT$/,""), f=v=>fpx(v,o.entry);
   const body={act,key:o.id+":b",sym:o.sym,dir:o.dir,entry:o.entry,sl:o.sl,tp:o.tp,qty:o.acct&&o.acct.qty,lev:RULE.levMax};
   bnPost(body).then(j=>{ if(j.dup) return;
       if(act==="open"){ o.bn={ok:!!j.ok,msg:j.msg,avg:j.avg,qty:j.qty}; saveSigs(); renderStats(); toast(`Binance demo ${c}: ${j.msg}`);
-        tgNotify(o.id+":bo",`🔗 Binance demo: ${j.ok?"✅ ":"⚠️ "}${j.msg}`,o.id+":o"); }
-      else if(!j.ok){ toast(`Binance demo ${c} đóng lỗi: ${j.msg}`); tgNotify(o.id+":bc",`⚠️ Binance demo đóng lỗi: ${j.msg} — hãy đóng tay trên demo.binance.com`,o.id+":o"); } })
-    .catch(()=>{ toast(`Binance demo ${c}: chưa thấy bn_relay.py chạy trên máy`); if(act==="open") tgNotify(o.id+":bo","⚠️ Binance demo: bn_relay.py không chạy, lệnh không được đặt",o.id+":o"); }); }
+        if(!j.ok) return bnFail(o,j.msg);
+        const d=o.dir*(j.avg-o.entry), rr=o.risk?Math.abs(d)/o.risk:0, risk=j.qty*Math.abs(j.avg-o.sl);
+        const lech=Math.abs(d)<o.entry*1e-6?"khớp đúng giá":`lệch ${d>0?"xấu":"tốt"} ${f(Math.abs(d))} ≈ ${rr.toFixed(2)}R`;
+        tgNotify(o.id+":o",`[${keoName(o)}] 🔗 Binance demo\n${o.dir>0?"🟢 <b>MUA":"🔴 <b>BÁN"} ${c}</b>\nVào: ${f(j.avg)}\nBookmap: ${f(o.entry)} (${lech})\nSL: ${f(o.sl)}\nTP: ${f(o.tp)}\nKhối lượng: ${j.qty} ${c} · rủi ro ~${usd(risk)}`); }
+      else if(!j.ok){ toast(`Binance demo ${c} đóng lỗi: ${j.msg}`); tgNotify(o.id+":bc",`⚠️ Binance demo đóng lỗi: ${j.msg} — hãy đóng tay trên demo.binance.com`,o.id+":o"); }
+      else if(j.msg!=="không phải vị thế của lệnh này"){
+        const bm=`Bookmap: ${o.R>0?"+":""}${o.R.toFixed(2)}R${o.pnl!=null?` ${o.pnl>=0?"+":""}${usd(o.pnl)}`:""} (${closeWhy(o)}, thoát ${f(o.exit)})`;
+        if(j.pnl==null){ tgNotify(o.id+":c",`${o.R>0?"✅":"❌"} Đã đóng lệnh demo — ${j.msg}\n${bm}`,o.id+":o"); return; }
+        o.bn.exit=j.exit; o.bn.pnl=j.pnl; o.bn.fee=j.fee; saveSigs();
+        const how=j.by==="san"?(j.pnl>=0?"sàn chạm TP":"sàn chạm SL"):"đóng theo Bookmap ("+closeWhy(o)+")";
+        tgNotify(o.id+":c",`${j.pnl>=0?"✅":"❌"} ${how}\nThoát demo: ${f(j.exit)}\nLời/lỗ demo: ${j.pnl>=0?"+":""}${usd(j.pnl)} (phí ${usd(j.fee)})\n${bm}`,o.id+":o"); } })
+    .catch(()=>{ toast(`Binance demo ${c}: chưa thấy bn_relay.py chạy trên máy`); if(act==="open") bnFail(o,"bn_relay.py không chạy trên máy"); }); }
 const fpx=(v,ref)=>{ const d=ref>=1000?1:ref>=10?2:ref>=1?3:6; return (+v).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d}); };
 // tên kèo hiện trong tin Telegram
 const keoName=o=>"Kèo "+o.setup;   // ngắn gọn: Kèo A, Kèo E, Kèo F, Kèo D, Kèo G
-function tgOpen(o){ if(!isWatch(o)) return; const c=o.sym.replace(/USDT$/,"");
+function tgOpen(o){ if(!isWatch(o)||RULE.bnOn) return; const c=o.sym.replace(/USDT$/,"");
   const a=o.acct, sz=a?(a.note&&!a.qty?`\n⚠️ ${a.note}`:`\nKhối lượng: ${a.qty} ${c} (~$${Math.round(a.notional)}) · đòn bẩy ${a.lev}x\nRủi ro: ${usd(a.riskUsd)} (TK ${usd(a.bal)})${a.note?`\n⚠️ ${a.note}`:""}`):"";
   tgNotify(o.id+":o",`[${keoName(o)}]\n${o.dir>0?"🟢 <b>MUA":"🔴 <b>BÁN"} ${c}</b>\nVào: ${fpx(o.entry,o.entry)}\nSL: ${fpx(o.sl,o.entry)}\nTP: ${fpx(o.tp,o.entry)}${sz}`); }
-function tgClose(o){ if(!isWatch(o)) return; const c=o.sym.replace(/USDT$/,""), h=/TP/.test(o.how)?"chạm TP":/SL/.test(o.how)?"chạm SL":/thoát sớm/.test(o.how)?`thoát sớm (sau ${Math.round((o.tstop||0)/60000)} phút chưa có lời)`:`hết ${Math.round((o.hold||1800000)/60000)} phút`;
+const closeWhy=o=>/TP/.test(o.how)?"chạm TP":/SL/.test(o.how)?"chạm SL":/thoát sớm/.test(o.how)?`thoát sớm sau ${Math.round((o.tstop||0)/60000)} phút chưa có lời`:`hết ${Math.round((o.hold||1800000)/60000)} phút`;
+function tgClose(o){ if(!isWatch(o)||RULE.bnOn) return; const c=o.sym.replace(/USDT$/,""), h=closeWhy(o);
   const m=o.pnl!=null?` · ${o.pnl>=0?"+":""}${usd(o.pnl)} · TK ${usd(acctBal())}`:"";
   tgNotify(o.id+":c",`${o.R>0?"✅":"❌"} ${h} (${o.R>0?"+":""}${o.R.toFixed(2)}R)${m}`,o.id+":o"); }
 function parseCSV(t){ const rows=[]; let row=[], f="", q=false;

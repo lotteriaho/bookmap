@@ -149,6 +149,7 @@ def do_open(b):
         req("POST", "/fapi/v1/leverage", {"symbol": sym, "leverage": max(1, min(50, round(b.get("lev") or 20)))})
     except BinanceError as e:
         log(f"  (đặt đòn bẩy: {e})")
+    t0 = int(time.time() * 1000) - 2000
     od = req("POST", "/fapi/v1/order", {"symbol": sym, "side": "BUY" if buy else "SELL", "type": "MARKET",
                                          "quantity": qty, "newOrderRespType": "RESULT"})
     avg = float(od.get("avgPrice") or 0) or float(b["entry"])
@@ -164,17 +165,41 @@ def do_open(b):
         except BinanceError:
             pass
         return {"ok": False, "msg": f"không đặt được SL/TP nên đã đóng lại: {e}"}
-    state["own"][sym] = b["key"]
+    state["own"][sym] = {"key": b["key"], "t": t0, "side": "BUY" if buy else "SELL"}
     return {"ok": True, "msg": f"khớp {qty} @ {avg:g}", "avg": avg, "qty": float(qty)}
+
+
+def result(sym, own):
+    """Lời/lỗ thật của vị thế từ lịch sử khớp lệnh: giá vào, giá thoát, phí, lời/lỗ ròng (USDT)."""
+    tr = req("GET", "/fapi/v1/userTrades", {"symbol": sym, "startTime": own["t"], "limit": 100})
+    ent = [x for x in tr if x["side"] == own["side"]]
+    ex = [x for x in tr if x["side"] != own["side"]]
+    avg = lambda L: sum(float(x["price"]) * float(x["qty"]) for x in L) / sum(float(x["qty"]) for x in L) if L else None
+    fee = sum(float(x["commission"]) for x in tr if x.get("commissionAsset") == "USDT")
+    gross = sum(float(x["realizedPnl"]) for x in tr)
+    return {"entry": avg(ent), "exit": avg(ex), "fee": round(fee, 4), "pnl": round(gross - fee, 4)}
 
 
 def do_close(b):
     sym = str(b["sym"])
-    if state["own"].get(sym) != b["key"]:
+    own = state["own"].get(sym)
+    if not isinstance(own, dict) or own.get("key") != b["key"]:
         return {"ok": True, "msg": "không phải vị thế của lệnh này"}
     px = flat(sym)
     state["own"].pop(sym, None)
-    return {"ok": True, "msg": f"đã đóng @ {px:g}" if px else "vị thế đã đóng bởi SL/TP trên sàn"}
+    r = {"ok": True, "by": "bookmap" if px else "san", "msg": f"đã đóng @ {px:g}" if px else "vị thế đã đóng bởi SL/TP trên sàn"}
+    for _ in range(3):                                 # lệnh vừa khớp có thể chưa kịp vào lịch sử
+        try:
+            res = result(sym, own)
+            if res["exit"] is not None:
+                r.update(res)
+                r["msg"] += f" · thoát {res['exit']:g} · lời/lỗ {res['pnl']:+.2f} USDT (phí {res['fee']:.2f})"
+                break
+        except BinanceError as e:
+            r["msg"] += f" · (chưa đọc được lời/lỗ: {e})"
+            break
+        time.sleep(1)
+    return r
 
 
 def handle(b):
