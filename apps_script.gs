@@ -131,11 +131,14 @@ function telegram_(u) {
 function caiHistory() {
   const p = PropertiesService.getScriptProperties(), tok = p.getProperty('TG_TOKEN');
   if (!tok) throw new Error('chưa cài TG_TOKEN');
-  const url = ScriptApp.getService().getUrl().replace(/\/dev$/, '/exec');
+  // URL /exec của bản triển khai đang chạy: thêm thuộc tính WEBAPP_URL (getService().getUrl() có thể trả về bản /dev, Telegram không gọi được)
+  const url = p.getProperty('WEBAPP_URL') || ScriptApp.getService().getUrl();
   const r1 = UrlFetchApp.fetch('https://api.telegram.org/bot' + tok + '/setWebhook', { method: 'post', muteHttpExceptions: true,
     payload: { url: url, allowed_updates: JSON.stringify(['message']), drop_pending_updates: 'true' } });
   const r2 = UrlFetchApp.fetch('https://api.telegram.org/bot' + tok + '/setMyCommands', { method: 'post', muteHttpExceptions: true,
     payload: { commands: JSON.stringify([{ command: 'history', description: 'Thống kê kèo đang test (thêm 24h / 7d / BTC)' }]) } });
+  Utilities.sleep(1500);
+  Logger.log('webhook info: ' + UrlFetchApp.fetch('https://api.telegram.org/bot' + tok + '/getWebhookInfo', { muteHttpExceptions: true }).getContentText());
   Logger.log('setWebhook: ' + r1.getContentText() + ' · setMyCommands: ' + r2.getContentText());
 }
 
