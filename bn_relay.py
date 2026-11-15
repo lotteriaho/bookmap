@@ -61,10 +61,12 @@ def load_state():
         with open(STATE_PATH, encoding="utf-8") as f:
             return json.load(f)
     except (OSError, ValueError):
-        return {"done": {}, "own": {}}
+        return {"done": {}, "lots": {}}
 
 
 state = load_state()
+state.setdefault("lots", {})
+state.pop("own", None)                                 # dạng cũ (1 vị thế/mã) không dùng nữa
 
 
 def save_state():
@@ -131,23 +133,11 @@ def rnd(v, step, floor=False):
     return format((n * st).normalize(), "f")
 
 
-def position(sym):
-    return sum(float(x["positionAmt"]) for x in req("GET", "/fapi/v3/positionRisk", {"symbol": sym}))
-
-
-def flat(sym):
-    for path in ("/fapi/v1/algoOpenOrders", "/fapi/v1/allOpenOrders"):
-        try:
-            req("DELETE", path, {"symbol": sym})
-        except BinanceError:
-            pass
-    amt = position(sym)
-    if amt == 0:
-        return False                                   # sàn đã tự đóng (SL/TP trên sàn)
-    req("POST", "/fapi/v1/order", {"symbol": sym, "side": "SELL" if amt > 0 else "BUY", "type": "MARKET",
-                                         "quantity": format(abs(amt), "f"), "reduceOnly": "true",
-                                         "newOrderRespType": "RESULT"})
-    return True                                        # vị thế còn → Bookmap đóng bằng lệnh Market
+# ===== Chế độ HEDGE: mỗi lệnh Bookmap là một "lô" riêng với SL/TP riêng (theo khối lượng), nên vào được
+# nhiều lệnh cùng mã, cả mua lẫn bán, không lệnh nào đóng nhầm lệnh khác. =====
+def pos_amt(sym, ps):
+    """Khối lượng (dương) đang mở của phía LONG hoặc SHORT."""
+    return sum(abs(float(x["positionAmt"])) for x in req("GET", "/fapi/v3/positionRisk", {"symbol": sym}) if x.get("positionSide") == ps)
 
 
 def fill_avg(sym, side, t0):
@@ -160,11 +150,22 @@ def fill_avg(sym, side, t0):
     return None
 
 
+def market(sym, side, ps, qty):
+    od = req("POST", "/fapi/v1/order", {"symbol": sym, "side": side, "positionSide": ps, "type": "MARKET",
+                                         "quantity": qty, "newOrderRespType": "RESULT"})
+    return float(od.get("avgPrice") or 0)
+
+
+def cancel_algo(aid):
+    try:
+        req("DELETE", "/fapi/v1/algoOrder", {"algoId": aid})
+    except BinanceError:
+        pass                                           # đã khớp / đã huỷ thì thôi
+
+
 def do_open(b):
     sym, buy = str(b["sym"]), b["dir"] > 0
     inf = sym_info(sym)
-    if position(sym) != 0:
-        return {"ok": False, "msg": f"đã có vị thế {sym}, bỏ qua"}
     qty = rnd(float(b["qty"]), inf["step"], floor=True)
     if float(qty) < inf["minQty"] or float(qty) * float(b["entry"]) < inf["minNot"]:
         return {"ok": False, "msg": f"khối lượng {qty} dưới mức tối thiểu của sàn ({inf['minNot']:g}$)"}
@@ -172,68 +173,88 @@ def do_open(b):
         req("POST", "/fapi/v1/leverage", {"symbol": sym, "leverage": max(1, min(50, round(b.get("lev") or 20)))})
     except BinanceError as e:
         log(f"  (đặt đòn bẩy: {e})")
+    ps, side, back = ("LONG", "BUY", "SELL") if buy else ("SHORT", "SELL", "BUY")
     t0 = int(time.time() * 1000) - 2000
-    od = req("POST", "/fapi/v1/order", {"symbol": sym, "side": "BUY" if buy else "SELL", "type": "MARKET",
-                                         "quantity": qty, "newOrderRespType": "RESULT"})
-    avg = float(od.get("avgPrice") or 0)
+    avg = market(sym, side, ps, qty)
     if not avg:
         try:
-            avg = fill_avg(sym, "BUY" if buy else "SELL", t0) or 0
+            avg = fill_avg(sym, side, t0) or 0
         except BinanceError:
             avg = 0
-    back = "SELL" if buy else "BUY"
-    # Giá trên sàn demo chạy lệch giá Binance thật (có lúc vài chục–vài trăm USD), nên SL/TP đặt theo
-    # giá khớp demo, giữ nguyên khoảng cách như lệnh giấy; nếu không sẽ bị lỗi -2021 "would immediately trigger".
+    # Giá sàn demo lệch giá thật nên SL/TP đặt theo giá khớp demo, giữ đúng khoảng cách như lệnh giấy.
     ref = avg or float(b["entry"])
     d = 1 if buy else -1
     sl_px = ref - d * abs(float(b["entry"]) - float(b["sl"]))
     tp_px = ref + d * abs(float(b["tp"]) - float(b["entry"]))
+    ids = []
     try:
         for typ, px in (("STOP_MARKET", sl_px), ("TAKE_PROFIT_MARKET", tp_px)):
-            req("POST", "/fapi/v1/algoOrder", {"algoType": "CONDITIONAL", "symbol": sym, "side": back, "type": typ,
-                                                "triggerPrice": rnd(float(px), inf["tick"]), "closePosition": "true",
-                                                "workingType": "CONTRACT_PRICE"})
-    except BinanceError as e:                          # không có SL/TP thì đóng ngay, không để vị thế trần
+            r = req("POST", "/fapi/v1/algoOrder", {"algoType": "CONDITIONAL", "symbol": sym, "side": back, "positionSide": ps,
+                                                   "type": typ, "quantity": qty, "triggerPrice": rnd(float(px), inf["tick"]),
+                                                   "workingType": "CONTRACT_PRICE"})
+            ids.append(r.get("algoId"))
+    except BinanceError as e:                          # không có SL/TP thì đóng ngay lô này, không để vị thế trần
+        for aid in ids:
+            cancel_algo(aid)
         try:
-            flat(sym)
+            market(sym, back, ps, qty)
         except BinanceError:
             pass
         return {"ok": False, "msg": f"không đặt được SL/TP nên đã đóng lại: {e}"}
-    state["own"][sym] = {"key": b["key"], "t": t0, "side": "BUY" if buy else "SELL"}
+    state["lots"][b["key"]] = {"sym": sym, "ps": ps, "back": back, "dir": d, "qty": qty, "entry": ref,
+                               "sl_id": ids[0], "tp_id": ids[1], "t": t0}
     return {"ok": True, "msg": f"khớp {qty} @ {avg:g}" if avg else f"khớp {qty} (chưa đọc được giá khớp)",
             "avg": avg or None, "qty": float(qty), "rate": taker_rate(sym)}
 
 
-def result(sym, own):
-    """Lời/lỗ thật của vị thế từ lịch sử khớp lệnh: giá vào, giá thoát, phí, lời/lỗ ròng (USDT)."""
-    tr = req("GET", "/fapi/v1/userTrades", {"symbol": sym, "startTime": own["t"], "limit": 100})
-    ent = [x for x in tr if x["side"] == own["side"]]
-    ex = [x for x in tr if x["side"] != own["side"]]
-    avg = lambda L: sum(float(x["price"]) * float(x["qty"]) for x in L) / sum(float(x["qty"]) for x in L) if L else None
-    fee = sum(float(x["commission"]) for x in tr if x.get("commissionAsset") == "USDT")
-    gross = sum(float(x["realizedPnl"]) for x in tr)
-    return {"entry": avg(ent), "exit": avg(ex), "fee": round(fee, 4), "pnl": round(gross - fee, 4)}
+def algo_state(aid):
+    j = req("GET", "/fapi/v1/algoOrder", {"algoId": aid})
+    hit = bool(j.get("actualOrderId")) or j.get("algoStatus") in ("TRIGGERED", "FINISHED")
+    return hit, float(j.get("actualPrice") or 0)
+
+
+def check_lot(key, lot):
+    """Nếu SL hoặc TP của lô đã chạy trên sàn: huỷ lệnh còn lại và ghi giá thoát."""
+    if lot.get("closed"):
+        return
+    for name, aid, other in (("SL", lot["sl_id"], lot["tp_id"]), ("TP", lot["tp_id"], lot["sl_id"])):
+        hit, px = algo_state(aid)
+        if hit:
+            cancel_algo(other)
+            lot["closed"] = {"how": name, "exit": px or None}
+            log(f"SÀN   {lot['sym']} {lot['ps']} chạm {name}" + (f" @ {px:g}" if px else ""))
+            return
+
+
+def pnl_of(lot, exit_px):
+    q = float(lot["qty"]); rate = taker_rate(lot["sym"]) or 0.0005
+    fee = rate * q * (lot["entry"] + exit_px)
+    return round(lot["dir"] * (exit_px - lot["entry"]) * q - fee, 4), round(fee, 4)
 
 
 def do_close(b):
-    sym = str(b["sym"])
-    own = state["own"].get(sym)
-    if not isinstance(own, dict) or own.get("key") != b["key"]:
+    key = b["key"]
+    lot = state["lots"].get(key)
+    if not lot:
         return {"ok": True, "msg": "không phải vị thế của lệnh này"}
-    by_us = flat(sym)
-    state["own"].pop(sym, None)
-    r = {"ok": True, "by": "bookmap" if by_us else "san", "msg": "Bookmap đóng bằng lệnh Market" if by_us else "vị thế đã đóng bởi SL/TP trên sàn"}
-    for _ in range(3):                                 # lệnh vừa khớp có thể chưa kịp vào lịch sử
-        try:
-            res = result(sym, own)
-            if res["exit"] is not None:
-                r.update(res)
-                r["msg"] += f" · thoát {res['exit']:g} · lời/lỗ {res['pnl']:+.2f} USDT (phí {res['fee']:.2f})"
-                break
-        except BinanceError as e:
-            r["msg"] += f" · (chưa đọc được lời/lỗ: {e})"
-            break
-        time.sleep(1)
+    check_lot(key, lot)
+    if lot.get("closed"):                              # sàn đã tự đóng lô này
+        c = lot["closed"]; by = "san"
+        exit_px = c["exit"]
+        if not exit_px:
+            hit, exit_px = algo_state(lot["sl_id"] if c["how"] == "SL" else lot["tp_id"])
+        msg = f"sàn chạm {c['how']}"
+    else:                                              # Bookmap đóng: huỷ SL/TP của lô, đóng đúng khối lượng lô
+        cancel_algo(lot["sl_id"]); cancel_algo(lot["tp_id"])
+        q = min(float(lot["qty"]), pos_amt(lot["sym"], lot["ps"]))
+        exit_px = market(lot["sym"], lot["back"], lot["ps"], rnd(q, sym_info(lot["sym"])["step"], floor=True)) if q > 0 else 0
+        by, msg = "bookmap", "Bookmap đóng bằng lệnh Market"
+    state["lots"].pop(key, None)
+    r = {"ok": True, "by": by, "msg": msg}
+    if exit_px:
+        pnl, fee = pnl_of(lot, exit_px)
+        r.update(exit=exit_px, pnl=pnl, fee=fee)
+        r["msg"] += f" · thoát {exit_px:g} · lời/lỗ {pnl:+.2f} USDT (phí {fee:.2f})"
     return r
 
 
@@ -243,7 +264,7 @@ def handle(b):
         bal = next((x["balance"] for x in req("GET", "/fapi/v3/balance") if x["asset"] == "USDT"), "?")
         if b.get("from"):
             log("Bookmap đã nối tới — sẵn sàng vào lệnh")
-        return {"ok": True, "msg": f"Binance demo OK · số dư {float(bal):,.2f} USDT", "rate": taker_rate("BTCUSDT")}
+        return {"ok": True, "msg": f"Binance demo OK · số dư {float(bal):,.2f} USDT · {len(state['lots'])} lệnh đang mở", "rate": taker_rate("BTCUSDT")}
     if act not in ("open", "close") or not key:
         return {"ok": False, "msg": "yêu cầu sai"}
     dk = act + ":" + key
@@ -259,6 +280,19 @@ def handle(b):
     side = ("MUA " if b.get("dir", 0) > 0 else "BÁN ") if act == "open" else ""
     log(f"{act.upper():5} {b.get('sym')} {side}→ {r['msg']}")
     return r
+
+
+def watcher():
+    """Mỗi 5 giây: lô nào đã chạm SL/TP trên sàn thì huỷ ngay lệnh còn lại, để nó không đóng nhầm lô khác."""
+    while True:
+        time.sleep(5)
+        with lock:
+            for key, lot in list(state["lots"].items()):
+                try:
+                    check_lot(key, lot)
+                except BinanceError:
+                    pass
+            save_state()
 
 
 class H(BaseHTTPRequestHandler):
@@ -302,12 +336,12 @@ if __name__ == "__main__":
         print(handle({"act": "ping"})["msg"])
     except Exception as e:
         print("⚠ Chưa nối được Binance demo:", e)
-    try:
-        mode = req("GET", "/fapi/v1/positionSide/dual").get("dualSidePosition")
-        if mode:
-            req("POST", "/fapi/v1/positionSide/dual", {"dualSidePosition": "false"})
-            print("Đã chuyển tài khoản demo sang chế độ vị thế một chiều.")
+    try:                                               # cần chế độ HEDGE để giữ nhiều lệnh độc lập
+        if not req("GET", "/fapi/v1/positionSide/dual").get("dualSidePosition"):
+            req("POST", "/fapi/v1/positionSide/dual", {"dualSidePosition": "true"})
+            print("Đã chuyển tài khoản demo sang chế độ Hedge (giữ được nhiều lệnh cùng lúc).")
     except BinanceError as e:
-        print("⚠ Không kiểm tra được chế độ vị thế:", e)
+        print("⚠ Chưa chuyển được sang chế độ Hedge:", e, "— hãy đóng hết vị thế trên demo.binance.com rồi chạy lại.")
+    threading.Thread(target=watcher, daemon=True).start()
     print(f"Đang chờ tín hiệu từ Bookmap ở http://127.0.0.1:{PORT} — để cửa sổ này mở. Ctrl+C để dừng.")
     ThreadingHTTPServer(("127.0.0.1", PORT), H).serve_forever()
