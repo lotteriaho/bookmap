@@ -61,8 +61,8 @@ function doGet() {
 }
 
 // gửi tin; replyTo = message_id của tin cần trả lời (tin báo vào lệnh) → tin đóng lệnh hiện dạng trả lời
-function tg_(text, replyTo) {
-  const p = PropertiesService.getScriptProperties(), tok = p.getProperty('TG_TOKEN'), chat = p.getProperty('TG_CHAT');
+function tg_(text, replyTo, toChat) {
+  const p = PropertiesService.getScriptProperties(), tok = p.getProperty('TG_TOKEN'), chat = toChat || p.getProperty('TG_CHAT');
   if (!tok || !chat) return { res: 'chưa cài TG_TOKEN / TG_CHAT' };
   const payload = { chat_id: chat, text: String(text).slice(0, 3500), parse_mode: 'HTML', disable_web_page_preview: 'true' };
   if (replyTo) payload.reply_parameters = JSON.stringify({ message_id: Number(replyTo), allow_sending_without_reply: true });
@@ -73,7 +73,7 @@ function tg_(text, replyTo) {
 }
 function thuTelegram() { Logger.log(tg_('✅ Bookmap mini: đã nối Telegram qua Google Sheet').res); }
 
-// ===== /history trên Telegram =====
+// ===== /history trên Telegram (KHÔNG dùng được qua webhook: Apps Script trả 302, Telegram coi là lỗi) — đã thay bằng nút 📊 trong Bookmap =====
 const HIST_FROM = Date.parse('2026-11-15T12:51:00+07:00');   // thống kê tính từ lúc này (đổi bằng thuộc tính HIST_T0 nếu muốn)
 const HIST_KEO = ['E/F', 'G', 'D', 'A'];
 function money_(v) { return (v >= 0 ? '+' : '−') + '$' + Math.abs(v).toFixed(2); }
@@ -182,4 +182,10 @@ function xoaWebhook() {
   UrlFetchApp.fetch('https://api.telegram.org/bot' + tok + '/getUpdates?limit=1&timeout=0&allowed_updates=' + encodeURIComponent('[]'), { muteHttpExceptions: true });
   const i = UrlFetchApp.fetch('https://api.telegram.org/bot' + tok + '/getWebhookInfo', { muteHttpExceptions: true });
   Logger.log('deleteWebhook: ' + r.getContentText() + ' · info: ' + i.getContentText());
+}
+
+// xem tình trạng webhook (lỗi gần nhất nếu Telegram không gọi được)
+function xemWebhook() {
+  const tok = PropertiesService.getScriptProperties().getProperty('TG_TOKEN');
+  Logger.log(UrlFetchApp.fetch('https://api.telegram.org/bot' + tok + '/getWebhookInfo', { muteHttpExceptions: true }).getContentText());
 }
