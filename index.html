@@ -917,6 +917,8 @@ function EPS(kind){ const L=S.sym.toLowerCase(), U=S.sym;
 }
 function status(t,cls){const e=$("st"); e.textContent=t; e.className="st "+cls;}
 function resetData(){S.book.bids.clear();S.book.asks.clear();S.cols=[];S.cur=null;S.cvd=0;S.profile.clear();S.center=null;S.last=null;S.synced=false;S.buf=[];S.dirty=true;S.qScale=5;S.qInit=0;S.snapFail=0;S.streamOnly=false;S.walls.clear();S.marks=[];S.absFired.clear();S.liqWin=[];S.bucket=null;S.tick=0;$("bkv").textContent="";}
+const MAJOR=/^(BTC|ETH|SOL|BNB|XRP|DOGE|ADA|AVAX|LINK|DOT|LTC|TRX|TON|SUI|BCH|NEAR|APT|ARB|OP|ETC|FIL|ATOM|UNI|AAVE|INJ|TIA|WLD|SEI|HYPE|ENA)(USDT|USDC)$/;
+const normSym=s=>{ const t=String(s||"").replace(/^1000/,""); return /^1000/.test(s)&&MAJOR.test(t)?t:s; };   // sửa 1000BTCUSDT (tên sai do lần rớt mạng trước) → BTCUSDT
 function stopAll(){ S.gen++; for(const w of (S.socks||[])){ try{w.close();}catch(e){} } S.socks=[]; clearInterval(S.demo); S.demo=null; }
 
 async function fetchSnapshot(list){
@@ -926,12 +928,12 @@ async function fetchSnapshot(list){
 async function connect(kind,wsIdx=0){
   stopAll(); const gen=S.gen, ep=EPS(kind);
   await saveHist(); if(gen!==S.gen) return;
-  resetData(); $("sym").textContent=ep.name; if(S.onSym) S.onSym();
+  resetData(); $("sym").textContent=ep.name;
   status("Đang tải lịch sử…","wait");
   await restoreHist(kind,gen); if(gen!==S.gen) return;
   status("Đang kết nối Binance…","wait");
   const urls=ep.ws[wsIdx]; S.socks=[]; let opened=0, gotData=false, started=false;
-  const onmsg=ev=>{ if(gen!==S.gen) return; gotData=true; S.lastMsgT=Date.now(); S.okSyms.add(kind+S.sym); S.retryN=0; const m=JSON.parse(ev.data), d=m.data||m;
+  const onmsg=ev=>{ if(gen!==S.gen) return; gotData=true; S.lastMsgT=Date.now(); if(!S.okSyms.has(kind+S.sym)){ S.okSyms.add(kind+S.sym); if(S.onSym) S.onSym(); } S.retryN=0; const m=JSON.parse(ev.data), d=m.data||m;
     if(d.e==="aggTrade"){ if(S.tick===0) noteTick(d.p); onTrade(+d.p,+d.q,d.m,d.T); return; }
     if(d.e==="forceOrder"&&d.o){ const o=d.o; onLiq(+(o.ap||o.p),+(o.z||o.q),o.S==="SELL",o.T); return; }
     if(d.e==="depthUpdate"){ if(!S.synced){S.buf.push(d); return;} applyDepth(kind,d,gen); } };
@@ -950,8 +952,9 @@ function retryLater(kind,why){ stopAll(); const gen=S.gen; S.retryN=(S.retryN||0
 function fail(kind,wsIdx){
   if(wsIdx+1<EPS(kind).ws.length) return connect(kind,wsIdx+1);
   if(S.okSyms.has(kind+S.sym)) return retryLater(kind,"Mất kết nối Binance");     // mã này đã từng chạy được → chỉ là rớt mạng, thử lại
-  if(kind==="fut"&&!/^1000/.test(S.sym)&&!S.tried1000){ S.tried1000=true; S.sym="1000"+S.sym; $("symin").value=S.sym; return connect(kind,0); }
-  if(S.tried1000&&/^1000/.test(S.sym)){ S.sym=S.sym.replace(/^1000/,""); $("symin").value=S.sym; }
+  // mã nhỏ giá (PEPE, SHIB…) trên Futures có tên 1000PEPE…; mã lớn (BTC, ETH…) không bao giờ thêm 1000
+  if(kind==="fut"&&!/^1000/.test(S.sym)&&!MAJOR.test(S.sym)&&!S.tried1000){ S.tried1000=true; S.sym="1000"+S.sym; $("symin").value=S.sym; return connect(kind,0); }
+  if(/^1000/.test(S.sym)&&(S.tried1000||!S.triedStrip)){ S.triedStrip=true; S.sym=S.sym.replace(/^1000/,""); $("symin").value=S.sym; if(!S.tried1000) return connect(kind,0); }
   retryLater(kind,`Không nhận được dữ liệu ${S.sym} (mạng chặn hoặc sai tên mã)`); }
 async function resync(kind,gen){
   S.synced=false;
@@ -1157,7 +1160,7 @@ function startDemo(fromFail){
 // ---------- controls ----------
 $("mkt").onchange=e=>{S.mkt=e.target.value; S.mkt==="demo"?startDemo(false):connect(S.mkt);};
 $("bucket").onchange=e=>{S.bmul=+e.target.value; if(HIST.key){HIST.key=histKey(S.mkt);HIST.lastN=S.colN-1;} S.bucket=null; S.cur=null; S.cols=[];S.profile.clear();S.walls.clear();S.marks=[];S.absFired.clear();S.center=null;S.dirty=true; if(S.mkt==="demo"&&!S.demo) startDemo(false);};
-function openSym(){ S.tried1000=false; const v=($("symin").value||"").trim().toUpperCase().replace(/[^A-Z0-9]/g,""); if(!v) return; S.sym=v.endsWith("USDT")||v.endsWith("USDC")?v:v+"USDT"; $("symin").value=S.sym;
+function openSym(){ S.tried1000=false; S.triedStrip=false; const v=($("symin").value||"").trim().toUpperCase().replace(/[^A-Z0-9]/g,""); if(!v) return; S.sym=normSym(v.endsWith("USDT")||v.endsWith("USDC")?v:v+"USDT"); $("symin").value=S.sym;
   if(!document.body.classList.contains("embed")) try{localStorage.setItem("bm_sym",S.sym);}catch(e){}
   if(S.mkt==="demo"){ S.mkt="fut"; $("mkt").value="fut"; } connect(S.mkt); }
 $("symgo").onclick=openSym; $("symin").addEventListener("keydown",e=>{ if(e.key==="Enter") openSym(); });
@@ -1243,7 +1246,7 @@ if(EMBED){ document.body.classList.add("embed"); $("gridbtn").style.display="non
 $("gridbtn").onclick=()=>{ location.href="grid.html"; };
 S.onSym=()=>toParent({type:"sym",sym:S.sym});
 let saved=null; try{saved=localStorage.getItem("bm_sym");}catch(e){}
-S.sym=(q.get("sym")||saved||"BTCUSDT").toUpperCase(); $("symin").value=S.sym;
+S.sym=normSym((q.get("sym")||saved||"BTCUSDT").toUpperCase()); $("symin").value=S.sym;
 if(q.get("demo")==="1"){ $("mkt").value="demo"; S.mkt="demo"; startDemo(false); } else connect("fut");
 })();
 </script>
