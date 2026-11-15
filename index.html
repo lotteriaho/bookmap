@@ -518,7 +518,8 @@ let H1T=0; try{ H1T=+(localStorage.getItem("bm_h1")||0); if(!H1T){ H1T=Date.now(
 // SL mà một lệnh hướng dir vào ở px sẽ dùng khi mốc là ref (giống B/C gốc)
 function baseRisk(dir,ref,px){ const B=S.bucket, minRisk=Math.max(4*B,0.5*recentRange(60),px*S.fee*3);
   const sl=dir>0?Math.min(ref-2*B,px-minRisk):Math.max(ref+2*B,px+minRisk); return Math.abs(px-sl); }
-S.pend=[];
+S.pend=[]; S.okSyms=new Set(); S.lastMsgT=0;
+window.addEventListener("online",()=>{ if(S.mkt!=="demo"&&Date.now()-S.lastMsgT>5000) connect(S.mkt,0); });
 function queueFade(setup,dir,ref,why,info){
   if(!S.auto||S.bestBid==null||!S.bucket) return "";
   const sym=S.mkt==="demo"?"DEMO":S.sym;
@@ -899,7 +900,9 @@ function frame(ts){
 // Đồng hồ chạy trong Web Worker: tab nằm nền vẫn chụp cột đều đặn (setInterval thường bị trình duyệt làm chậm còn 1 lần/phút)
 function startClock(){ clearInterval(S.timer); const tick=()=>{ const n=Date.now(); if(!S.paused) snapshotColumn(n);
     if(n-(S.hk10||0)>=10000){ S.hk10=n; saveHist(); touchSigs(); }          // lưu lịch sử + đánh dấu lệnh đang theo dõi
-    if(n-(S.hk60||0)>=60000){ S.hk60=n; resolveOpen(false); } };            // chấm lệnh của mã khác bằng nến 1m
+    if(n-(S.hk60||0)>=60000){ S.hk60=n; resolveOpen(false); }
+    // canh gác: đang "trực tiếp" mà 20 giây không có tin nào từ Binance (mạng treo, máy vừa thức dậy…) → nối lại
+    if(S.mkt!=="demo"&&S.socks&&S.socks.length&&S.lastMsgT&&n-S.lastMsgT>20000&&n-(S.wdT||0)>15000){ S.wdT=n; status("Không có dữ liệu 20 s, đang nối lại…","err"); connect(S.mkt,0); } };            // chấm lệnh của mã khác bằng nến 1m
   try{ if(!S.clockW){ S.clockW=new Worker(URL.createObjectURL(new Blob(["let t;onmessage=e=>{clearInterval(t);t=setInterval(()=>postMessage(0),e.data)}"],{type:"text/javascript"}))); S.clockW.onmessage=tick; }
     S.clockW.postMessage(S.speed); }
   catch(e){ S.clockW=null; S.timer=setInterval(tick,S.speed); } }
@@ -928,7 +931,7 @@ async function connect(kind,wsIdx=0){
   await restoreHist(kind,gen); if(gen!==S.gen) return;
   status("Đang kết nối Binance…","wait");
   const urls=ep.ws[wsIdx]; S.socks=[]; let opened=0, gotData=false, started=false;
-  const onmsg=ev=>{ if(gen!==S.gen) return; gotData=true; const m=JSON.parse(ev.data), d=m.data||m;
+  const onmsg=ev=>{ if(gen!==S.gen) return; gotData=true; S.lastMsgT=Date.now(); S.okSyms.add(kind+S.sym); S.retryN=0; const m=JSON.parse(ev.data), d=m.data||m;
     if(d.e==="aggTrade"){ if(S.tick===0) noteTick(d.p); onTrade(+d.p,+d.q,d.m,d.T); return; }
     if(d.e==="forceOrder"&&d.o){ const o=d.o; onLiq(+(o.ap||o.p),+(o.z||o.q),o.S==="SELL",o.T); return; }
     if(d.e==="depthUpdate"){ if(!S.synced){S.buf.push(d); return;} applyDepth(kind,d,gen); } };
@@ -936,17 +939,20 @@ async function connect(kind,wsIdx=0){
     S.socks.push(ws); ws.onmessage=onmsg; ws.onerror=()=>{};
     ws.onopen=async()=>{ opened++; if(!started){ started=true; status("Đang tải sổ lệnh…","wait"); await resync(kind,gen); } };
     ws.onclose=()=>{ if(gen!==S.gen) return; if(!opened) return fail(kind,wsIdx);
-      status("Mất kết nối, đang nối lại…","err"); setTimeout(()=>{ if(gen===S.gen) connect(kind,wsIdx); },3000); }; }
+      status("Mất kết nối, đang nối lại…","err"); setTimeout(()=>{ if(gen===S.gen) connect(kind,0); },3000); }; }
   if(!S.socks.length) return fail(kind,wsIdx);
   // không có dữ liệu sau 10 giây -> thử địa chỉ dự phòng
   setTimeout(()=>{ if(gen===S.gen && !gotData) fail(kind,wsIdx); },10000);
 }
+// thử lại có giãn cách: 5 s, 10 s, 20 s … tối đa 60 s — không bao giờ tự dừng hay chuyển sang dữ liệu mẫu nữa
+function retryLater(kind,why){ stopAll(); const gen=S.gen; S.retryN=(S.retryN||0)+1; const w=Math.min(60,5*2**Math.min(S.retryN-1,4));
+  status(`${why} — tự thử lại sau ${w} s (lần ${S.retryN})`,"err"); setTimeout(()=>{ if(gen===S.gen) connect(kind,0); },w*1000); }
 function fail(kind,wsIdx){
   if(wsIdx+1<EPS(kind).ws.length) return connect(kind,wsIdx+1);
+  if(S.okSyms.has(kind+S.sym)) return retryLater(kind,"Mất kết nối Binance");     // mã này đã từng chạy được → chỉ là rớt mạng, thử lại
   if(kind==="fut"&&!/^1000/.test(S.sym)&&!S.tried1000){ S.tried1000=true; S.sym="1000"+S.sym; $("symin").value=S.sym; return connect(kind,0); }
-  if(S.sym==="BTCUSDT"){ status("Không kết nối được Binance (mạng chặn?). Đang chạy dữ liệu mẫu.","err"); startDemo(true); }
-  else { stopAll(); status(`Không nhận được dữ liệu ${S.sym} trên ${kind==="fut"?"Futures":"Spot"}. Kiểm tra tên mã (vd ETHUSDT) hoặc đổi sàn.`,"err"); }
-}
+  if(S.tried1000&&/^1000/.test(S.sym)){ S.sym=S.sym.replace(/^1000/,""); $("symin").value=S.sym; }
+  retryLater(kind,`Không nhận được dữ liệu ${S.sym} (mạng chặn hoặc sai tên mã)`); }
 async function resync(kind,gen){
   S.synced=false;
   try{
