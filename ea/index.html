@@ -150,8 +150,7 @@ footer{font-size:12px;color:var(--mute);margin-top:18px;line-height:1.6}
     <span id="demoTag" class="demo hidden">Dữ liệu trình diễn</span>
     <span class="sp"></span>
     <span class="status" id="upd"><span class="pulse"></span>—</span>
-    <div class="seg" id="range"><button data-r="ea" class="on">Từ khi chạy EA</button><button data-r="all">Toàn bộ</button><button data-r="30">30N</button><button data-r="90">90N</button></div>
-    <input type="date" id="from" title="Tính từ ngày">
+    <span class="status" id="since">—</span>
     <button class="btn" id="reload" title="Làm mới dữ liệu">↻</button>
     <button class="btn" id="out" title="Đăng xuất">⏻</button>
   </div></div>
@@ -185,7 +184,7 @@ footer{font-size:12px;color:var(--mute);margin-top:18px;line-height:1.6}
     </div>
 
     <footer>
-      <div><b>Phương pháp.</b> R = lời/lỗ ÷ (số dư lúc vào lệnh × % rủi ro của chiến lược). Tăng trưởng và sụt giảm chỉ tính lệnh của 3 bot (time-weighted, đã loại nạp/rút và lệnh đánh tay); số dư là số dư thật của tài khoản. "Từ khi chạy EA" bắt đầu từ ngày bot vào lệnh đầu tiên. Giờ hiển thị theo giờ Việt Nam. Tài khoản cent được quy đổi sang USD (100 USC = 1 USD).</div>
+      <div><b>Phương pháp.</b> R = lời/lỗ ÷ (số dư lúc vào lệnh × % rủi ro của chiến lược). Tăng trưởng và sụt giảm chỉ tính lệnh của 3 bot (time-weighted, đã loại nạp/rút và lệnh đánh tay); số dư là số dư thật của tài khoản. Số liệu tính từ ngày bot vào lệnh đầu tiên. Giờ hiển thị theo giờ Việt Nam. Tài khoản cent được quy đổi sang USD (100 USC = 1 USD).</div>
       <div>Kết quả quá khứ không đảm bảo kết quả tương lai. Đây không phải lời khuyên đầu tư.</div>
     </footer>
   </main>
@@ -207,7 +206,7 @@ const tz='Asia/Ho_Chi_Minh';
 const dfmt=new Intl.DateTimeFormat('vi-VN',{timeZone:tz,day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
 const dshort=new Intl.DateTimeFormat('vi-VN',{timeZone:tz,day:'2-digit',month:'2-digit',year:'numeric'});
 const mkey=ms=>new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit'}).format(new Date(ms)).slice(0,7);
-let RAW=null,chart=null,view='acc',tradeFilter='all',DEMO=false,range=LS.get('ea_range2')||'ea';
+let RAW=null,chart=null,view='acc',tradeFilter='all',DEMO=false,range='ea';
 
 /* ---------- data ---------- */
 async function fetchData(url,pass){
@@ -280,15 +279,11 @@ function fromMs(){
   const now=new Date();
   if(range==='ea'){let t=Infinity;for(const r of (RAW&&RAW.deals)||[]){if(+r[2]<=1&&+r[3]===0&&BOTS[+r[4]])t=Math.min(t,(+r[1]-((RAW.snap||{}).off||0))*1000)}
     return isFinite(t)?new Date(new Intl.DateTimeFormat('en-CA',{timeZone:tz}).format(new Date(t))+'T00:00:00+07:00').getTime():0}
-  if(range==='30') return Date.now()-30*864e5;
-  if(range==='90') return Date.now()-90*864e5;
-  if(range==='ytd') return new Date(now.getFullYear()+'-01-01T00:00:00+07:00').getTime();
-  if(range==='custom'&&$('from').value) return new Date($('from').value+'T00:00:00+07:00').getTime();
   return 0;
 }
 function render(){
-  [...$('range').children].forEach(b=>b.classList.toggle('on',b.dataset.r===range));
-  const A=analyse(RAW,fromMs()), s=A.snap, age=s.rt?(Date.now()-s.rt)/60000:null, live=age!=null&&age<15;
+  const F0=fromMs(); $('since').textContent=F0?'Từ khi chạy EA · '+dshort.format(new Date(F0)):'Chưa có lệnh của bot';
+  const A=analyse(RAW,F0), s=A.snap, age=s.rt?(Date.now()-s.rt)/60000:null, live=age!=null&&age<15;
   $('upd').innerHTML=`<span class="pulse ${live?'':'off'}"></span>`+(s.rt?(live?'Trực tuyến':'Mất kết nối')+` · ${age<1?'vừa xong':Math.round(age)+' phút trước'}`:'Chưa có dữ liệu')+(s.real===false?' · demo':'');
   $('upd').title=s.rt?'MT5 gửi lúc '+dfmt.format(new Date(s.rt)):'';
   const nPos=(s.pos||[]).filter(p=>BOTS[p[1]]).length;
@@ -393,7 +388,6 @@ async function load(){
 }
 function show(){
   $('login').classList.add('hidden');$('app').classList.remove('hidden');$('demoTag').classList.toggle('hidden',!DEMO);
-  const f=LS.get('ea_from'); if(f&&!$('from').value) $('from').value=f;
   render();
 }
 $('go').onclick=()=>{let u=$('u').value.trim().replace(/\s+/g,''),p=$('p').value;
@@ -405,8 +399,6 @@ $('go').onclick=()=>{let u=$('u').value.trim().replace(/\s+/g,''),p=$('p').value
 $('p').addEventListener('keydown',e=>{if(e.key==='Enter')$('go').click()});
 $('out').onclick=()=>{LS.del('ea_pass');$('p').value='';if(DEMO){DEMO=false;location.hash=''}else load()};
 $('reload').onclick=load;
-$('range').onclick=e=>{const b=e.target.closest('button');if(!b)return;range=b.dataset.r;LS.set('ea_range2',range);render()};
-$('from').onchange=()=>{LS.set('ea_from',$('from').value);range=$('from').value?'custom':'ea';LS.set('ea_range2',range);render()};
 $('ctabs').onclick=e=>{const b=e.target.closest('.tab');if(!b)return;view=b.dataset.v;[...$('ctabs').children].forEach(x=>x.classList.toggle('on',x===b));render()};
 $('ttabs').onclick=e=>{const b=e.target.closest('.tab');if(!b)return;tradeFilter=b.dataset.k;render()};
 window.addEventListener('hashchange',()=>{DEMO=location.hash==='#demo';load()});
