@@ -3,152 +3,217 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Thống kê 3 EA</title>
+<title>Hiệu suất Danh mục EA</title>
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root{
-  --bg:#f4f5f2;--panel:#ffffff;--panel2:#eef0ea;--ink:#1d2320;--mute:#68716b;--line:#dde1d9;
-  --up:#13795b;--down:#c23b31;--warn:#b7791f;--accent:#2f5d50;
-  --gold:#b88a1b;--jpy:#3c6fb0;--btc:#d0702a;--tot:#1d2320;
-  --ok-bg:#e3f2ea;--warn-bg:#fbf0d9;--bad-bg:#fbe3e0;--stop-bg:#c23b31;
+  --bg:#f3f4f6;--panel:#ffffff;--sunk:#f7f8fa;--ink:#0e1726;--ink2:#334155;--mute:#6b7685;--line:#e3e6eb;--line2:#cfd5dd;
+  --brand:#0b2545;--brand-ink:#ffffff;--accent:#1f6feb;
+  --up:#0f7a4f;--down:#c0352b;--warn:#a96a00;
+  --up-bg:#e5f4ec;--down-bg:#fbe7e5;--warn-bg:#fdf1dc;--stop:#b42318;
+  --gold:#b8860b;--jpy:#2f6fbf;--btc:#e0731c;
+  --shadow:0 1px 2px rgba(14,23,38,.05),0 1px 1px rgba(14,23,38,.03);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#111513;--panel:#191e1b;--panel2:#212823;--ink:#e6ebe7;--mute:#8e9890;--line:#2b332e;
-  --up:#3cc497;--down:#f0786c;--warn:#e7b04e;--accent:#7fb9a5;
-  --gold:#e0b546;--jpy:#7aa7e6;--btc:#f09a55;--tot:#e6ebe7;
-  --ok-bg:#16302a;--warn-bg:#3a2f17;--bad-bg:#3d1f1c;--stop-bg:#b2362d;}}
+  --bg:#0a0f17;--panel:#111824;--sunk:#0d131d;--ink:#e7ecf3;--ink2:#c3ccd8;--mute:#8592a3;--line:#1e2836;--line2:#2b3747;
+  --brand:#e7ecf3;--brand-ink:#0a0f17;--accent:#5b9dff;
+  --up:#34c48b;--down:#ff6b5e;--warn:#f2b445;
+  --up-bg:#0f2a20;--down-bg:#341716;--warn-bg:#33270f;--stop:#e5483b;
+  --gold:#e3b341;--jpy:#6aa5ff;--btc:#ff9a4a;--shadow:none;}}
 :root[data-theme="dark"]{
-  --bg:#111513;--panel:#191e1b;--panel2:#212823;--ink:#e6ebe7;--mute:#8e9890;--line:#2b332e;
-  --up:#3cc497;--down:#f0786c;--warn:#e7b04e;--accent:#7fb9a5;
-  --gold:#e0b546;--jpy:#7aa7e6;--btc:#f09a55;--tot:#e6ebe7;
-  --ok-bg:#16302a;--warn-bg:#3a2f17;--bad-bg:#3d1f1c;--stop-bg:#b2362d;}
+  --bg:#0a0f17;--panel:#111824;--sunk:#0d131d;--ink:#e7ecf3;--ink2:#c3ccd8;--mute:#8592a3;--line:#1e2836;--line2:#2b3747;
+  --brand:#e7ecf3;--brand-ink:#0a0f17;--accent:#5b9dff;
+  --up:#34c48b;--down:#ff6b5e;--warn:#f2b445;
+  --up-bg:#0f2a20;--down-bg:#341716;--warn-bg:#33270f;--stop:#e5483b;
+  --gold:#e3b341;--jpy:#6aa5ff;--btc:#ff9a4a;--shadow:none;}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Be Vietnam Pro",system-ui,sans-serif}
-.num,td.n,.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
-.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 60px}
-header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin-bottom:18px}
-h1{font-size:22px;margin:0;font-weight:700;letter-spacing:-.01em}
-h2{font-size:15px;margin:0 0 10px;font-weight:600}
-.sub{color:var(--mute);font-size:13px}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "IBM Plex Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.mono,td.n,.kv{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.wrap{max-width:1240px;margin:0 auto;padding:0 16px}
+.up{color:var(--up)}.down{color:var(--down)}.mute{color:var(--mute)}
+button,input{font:inherit;color:inherit}
+
+/* top bar */
+.top{background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.top .wrap{display:flex;align-items:center;gap:10px;min-height:60px;flex-wrap:wrap;padding-top:8px;padding-bottom:8px}
+.mark{width:34px;height:34px;border-radius:8px;background:var(--brand);color:var(--brand-ink);display:grid;place-items:center;font:600 13px "IBM Plex Mono",monospace;letter-spacing:-.04em;flex:none}
+.brand h1{margin:0;font-size:16px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
+.brand .s{font-size:12px;color:var(--mute)}
 .sp{flex:1}
-button,select,input{font:inherit;color:var(--ink)}
-.btn{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
-.btn:hover{border-color:var(--accent)}
-.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--panel)}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
-.grid{display:grid;gap:12px}
-.kpis{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:12px}
-.kpi .l{color:var(--mute);font-size:12.5px}
-.kpi .v{font-size:22px;font-weight:600;margin-top:2px}
-.kpi .s{font-size:12.5px;color:var(--mute)}
-.up{color:var(--up)}.down{color:var(--down)}
-.rule{margin-bottom:12px;padding:10px 14px;border-radius:10px;font-size:14px}
-.bots{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-bottom:12px}
-.bot h3{margin:0;font-size:17px;display:flex;align-items:center;gap:8px}
-.badge{font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;margin-left:auto;white-space:nowrap}
-.b-ok{background:var(--ok-bg);color:var(--up)}.b-warn{background:var(--warn-bg);color:var(--warn)}
-.b-bad{background:var(--bad-bg);color:var(--down)}.b-stop{background:var(--stop-bg);color:#fff}
-.b-new{background:var(--panel2);color:var(--mute)}
-.stats{display:grid;grid-template-columns:1fr;gap:5px;margin:12px 0 10px;font-size:13.5px}
-.stats div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--line);padding-bottom:3px}
-.stats span:first-child{color:var(--mute)}
-.meter{margin-top:8px;font-size:12.5px}
-.meter .bar{height:7px;background:var(--panel2);border-radius:9px;overflow:hidden;margin-top:3px}
-.meter .bar i{display:block;height:100%;border-radius:9px}
-.note{font-size:12.5px;color:var(--mute);margin-top:8px}
-.tabs{display:flex;gap:6px;flex-wrap:wrap}
-.tab{border:1px solid var(--line);background:transparent;border-radius:99px;padding:3px 11px;cursor:pointer;font-size:13px}
-.tab.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
-.chartbox{position:relative;height:300px;margin-top:10px}
-.two{grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-bottom:12px}
-@media(max-width:860px){.two{grid-template-columns:1fr}}
+.status{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink2);padding:5px 10px;border:1px solid var(--line);border-radius:99px;background:var(--sunk);white-space:nowrap}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--up);box-shadow:0 0 0 3px var(--up-bg)}
+.pulse.off{background:var(--down);box-shadow:0 0 0 3px var(--down-bg)}
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:transparent;padding:6px 11px;font-size:12.5px;cursor:pointer;color:var(--ink2);border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--ink);color:var(--panel);font-weight:500}
+.btn{border:1px solid var(--line2);background:var(--panel);border-radius:8px;padding:6px 12px;font-size:12.5px;cursor:pointer;color:var(--ink2)}
+.btn:hover{border-color:var(--ink2)}
+.btn.pri{background:var(--ink);border-color:var(--ink);color:var(--panel);font-weight:500;padding:9px 16px;font-size:14px}
+input[type=date]{border:1px solid var(--line2);border-radius:8px;padding:5px 8px;background:var(--panel);font-size:12.5px}
+.demo{font-size:11.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--warn);background:var(--warn-bg);padding:4px 9px;border-radius:6px}
+
+/* layout */
+main{padding:20px 0 48px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.sec{margin-top:16px}
+.hd{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--line)}
+.hd h2{margin:0;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink2)}
+.hd .s{font-size:12.5px;color:var(--mute)}
+.bd{padding:16px 18px}
+.eyebrow{font-size:11.5px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--mute)}
+
+/* summary strip */
+.strip{display:grid;grid-template-columns:repeat(6,minmax(0,1fr))}
+.strip>div{padding:16px 18px;border-right:1px solid var(--line)}
+.strip>div:last-child{border-right:0}
+.strip .kv{font-size:22px;font-weight:600;margin:4px 0 2px;letter-spacing:-.02em;white-space:nowrap}
+.strip .f{font-size:12px;color:var(--mute)}
+@media(max-width:1000px){.strip{grid-template-columns:repeat(3,minmax(0,1fr))}.strip>div:nth-child(3n){border-right:0}.strip>div:nth-child(-n+3){border-bottom:1px solid var(--line)}}
+@media(max-width:560px){.strip{grid-template-columns:repeat(2,minmax(0,1fr))}.strip>div{border-right:1px solid var(--line)!important;border-bottom:1px solid var(--line)}.strip>div:nth-child(2n){border-right:0!important}.strip .kv{font-size:18px}}
+
+.risk{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:12px 18px 8px;border-top:1px solid var(--line);font-size:13px}
+.risk b{font-weight:600}
+.gauge{flex:1;min-width:140px;max-width:420px;margin:0 34px 12px 0;height:8px;border-radius:9px;background:linear-gradient(90deg,var(--up-bg) 0 80%,var(--warn-bg) 80% 100%);position:relative}
+.gauge i{position:absolute;top:-3px;width:3px;height:14px;border-radius:2px;background:var(--ink)}
+.gauge .t{position:absolute;top:-1px;height:10px;width:1px;background:var(--line2)}
+.gauge .lb{position:absolute;top:12px;font-size:10.5px;color:var(--mute);transform:translateX(-50%);white-space:nowrap}
+
+/* tables */
 .tw{overflow-x:auto}
 table{border-collapse:collapse;width:100%;font-size:13px}
-th{color:var(--mute);font-weight:500;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
-td{padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
-td.n,th.n{text-align:right}
-.login{max-width:420px;margin:12vh auto 0}
-.login label{display:block;font-size:13px;color:var(--mute);margin:12px 0 4px}
-.login input{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)}
-.err{color:var(--down);font-size:13px;margin-top:10px;min-height:18px}
-.demo{background:var(--warn-bg);color:var(--warn);padding:6px 12px;border-radius:8px;font-size:13px;font-weight:600}
-.hidden{display:none}
-.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+th{font-size:11.5px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--sunk)}
+td{padding:10px 10px;border-bottom:1px solid var(--line);white-space:nowrap;color:var(--ink2)}
+tr:last-child td{border-bottom:0}
+th.n,td.n{text-align:right}
+td.name{color:var(--ink);font-weight:600}
+.sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:8px;vertical-align:0}
+.pill{display:inline-block;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:6px;white-space:nowrap}
+.p-ok{background:var(--up-bg);color:var(--up)}.p-warn{background:var(--warn-bg);color:var(--warn)}
+.p-bad{background:var(--down-bg);color:var(--down)}.p-stop{background:var(--stop);color:#fff}.p-new{background:var(--sunk);color:var(--mute);border:1px solid var(--line)}
+.mbar{display:flex;align-items:center;gap:8px;min-width:118px}
+.mbar .b{flex:1;height:6px;background:var(--sunk);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.mbar .b i{display:block;height:100%}
+.mbar span{font-size:12px;min-width:52px;text-align:right}
+.sub{font-size:11.5px;color:var(--mute)}
+.notes{padding:10px 18px 14px;font-size:12.5px;color:var(--mute);border-top:1px solid var(--line)}
+.notes div+div{margin-top:3px}
+
+.tabs{display:inline-flex;gap:4px;background:var(--sunk);border:1px solid var(--line);padding:3px;border-radius:9px}
+.tab{border:0;background:transparent;border-radius:6px;padding:5px 11px;cursor:pointer;font-size:12.5px;color:var(--mute)}
+.tab.on{background:var(--panel);color:var(--ink);font-weight:500;box-shadow:var(--shadow);outline:1px solid var(--line)}
+.chartbox{position:relative;height:320px}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:16px}
+@media(max-width:900px){.two{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:700px){.top{position:static}.gauge .lb{display:none}.gauge{margin:0}.hd{padding:12px 14px}.chartbox{height:260px}}
+.heat{font-weight:500}
+
+/* login */
+.login{max-width:440px;margin:10vh auto 0;padding:0 16px}
+.login .card{padding:28px}
+.login h1{font-size:20px;margin:16px 0 4px;letter-spacing:-.01em}
+.login label{display:block;font-size:12px;font-weight:500;color:var(--ink2);margin:16px 0 6px}
+.login input{width:100%;padding:10px 12px;border:1px solid var(--line2);border-radius:8px;background:var(--panel);font-size:14px}
+.login input:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
+.err{color:var(--down);font-size:13px;margin-top:12px;min-height:18px}
+.hidden{display:none!important}
+footer{font-size:12px;color:var(--mute);margin-top:18px;line-height:1.6}
 </style>
 </head>
 <body>
-<div class="wrap">
 
-<section id="login" class="login panel hidden">
-  <h1>Thống kê 3 EA</h1>
-  <div class="sub">Vàng · USDJPY · BTC — lời/lỗ thực tế</div>
-  <label for="u">Link Apps Script (…/exec)</label>
-  <input id="u" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec">
-  <label for="p">Mật khẩu xem</label>
-  <input id="p" type="password" autocomplete="current-password">
-  <div class="row" style="margin-top:14px"><button class="btn pri" id="go">Xem thống kê</button><a class="sub" href="#demo" id="demoLink">Xem thử dữ liệu mẫu</a></div>
-  <div class="err" id="err"></div>
+<section id="login" class="login hidden">
+  <div class="card">
+    <div class="mark">EA</div>
+    <h1>Hiệu suất Danh mục EA</h1>
+    <div class="mute" style="font-size:13px">Báo cáo giao dịch thực tế · Vàng · USDJPY · Bitcoin</div>
+    <label for="u">Địa chỉ nguồn dữ liệu (Apps Script)</label>
+    <input id="u" autocomplete="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec">
+    <label for="p">Mật khẩu</label>
+    <input id="p" type="password" autocomplete="current-password">
+    <div style="display:flex;align-items:center;gap:14px;margin-top:20px">
+      <button class="btn pri" id="go">Đăng nhập</button>
+      <a href="#demo" style="font-size:13px;color:var(--accent);text-decoration:none">Xem bản trình diễn →</a>
+    </div>
+    <div class="err" id="err"></div>
+  </div>
 </section>
 
-<section id="app" class="hidden">
-  <header>
-    <div><h1>Thống kê 3 EA</h1><div class="sub" id="upd">—</div></div>
-    <span id="demoTag" class="demo hidden">DỮ LIỆU MẪU — không phải tài khoản thật</span>
+<div id="app" class="hidden">
+  <div class="top"><div class="wrap">
+    <div class="mark">EA</div>
+    <div class="brand"><h1>Hiệu suất Danh mục EA</h1><div class="s">Vàng · USDJPY · Bitcoin — Exness MT5</div></div>
+    <span id="demoTag" class="demo hidden">Dữ liệu trình diễn</span>
     <span class="sp"></span>
-    <label class="sub">Tính từ <input type="date" id="from" class="btn" style="padding:4px 8px"></label>
-    <button class="btn" id="reload">Làm mới</button>
-    <button class="btn" id="out">Thoát</button>
-  </header>
+    <span class="status" id="upd"><span class="pulse"></span>—</span>
+    <div class="seg" id="range"><button data-r="all" class="on">Toàn bộ</button><button data-r="30">30N</button><button data-r="90">90N</button><button data-r="ytd">Năm nay</button></div>
+    <input type="date" id="from" title="Tính từ ngày">
+    <button class="btn" id="reload" title="Làm mới dữ liệu">↻</button>
+    <button class="btn" id="out" title="Đăng xuất">Thoát</button>
+  </div></div>
 
-  <div id="rule" class="rule"></div>
-  <div class="grid kpis" id="kpis"></div>
-  <div class="grid bots" id="bots"></div>
+  <main class="wrap">
+    <div class="card">
+      <div class="strip" id="kpis"></div>
+      <div class="risk" id="rule"></div>
+    </div>
 
-  <div class="panel" style="margin-bottom:12px">
-    <div class="row"><h2 style="margin:0">Diễn biến</h2><span class="sp"></span>
-      <div class="tabs" id="ctabs"><button class="tab on" data-v="acc">Tài khoản (%)</button><button class="tab" data-v="r">R tích lũy từng bot</button><button class="tab" data-v="usd">USD tích lũy</button></div></div>
-    <div class="chartbox"><canvas id="ch"></canvas></div>
-  </div>
+    <div class="card sec">
+      <div class="hd"><h2>Hiệu suất theo chiến lược</h2><span class="s">So với mức xấu nhất trong backtest 2020–2026</span></div>
+      <div class="tw"><table id="bots"></table></div>
+      <div class="notes" id="botNotes"></div>
+    </div>
 
-  <div class="grid two">
-    <div class="panel"><h2>Theo tháng</h2><div class="tw"><table id="mon"></table></div></div>
-    <div class="panel"><h2>Lệnh đang mở</h2><div class="tw"><table id="open"></table></div><div class="note" id="openNote"></div></div>
-  </div>
+    <div class="card sec">
+      <div class="hd"><h2>Đường vốn</h2><span class="s">R và USD: lũy kế theo từng chiến lược</span><span class="sp"></span>
+        <div class="tabs" id="ctabs"><button class="tab on" data-v="acc">Tài khoản %</button><button class="tab" data-v="r">R</button><button class="tab" data-v="usd">USD</button></div></div>
+      <div class="bd"><div class="chartbox"><canvas id="ch"></canvas></div></div>
+    </div>
 
-  <div class="panel">
-    <div class="row"><h2 style="margin:0">Lệnh đã đóng</h2><span class="sp"></span><div class="tabs" id="ttabs"></div></div>
-    <div class="tw"><table id="trades"></table></div>
-  </div>
-  <div class="note" style="margin-top:14px">R = lời/lỗ ÷ (số dư lúc vào lệnh × % rủi ro của bot). "Mức xấu nhất" lấy từ backtest Strategy Tester 2020–11/2026. Số liệu quá khứ không đảm bảo tương lai.</div>
-</section>
+    <div class="two sec">
+      <div class="card"><div class="hd"><h2>Lợi nhuận theo tháng</h2></div><div class="tw"><table id="mon"></table></div></div>
+      <div class="card"><div class="hd"><h2>Vị thế đang mở</h2><span class="s" id="openNote"></span></div><div class="tw"><table id="open"></table></div></div>
+    </div>
+
+    <div class="card sec">
+      <div class="hd"><h2>Lịch sử giao dịch</h2><span class="s" id="tcount"></span><span class="sp"></span><div class="tabs" id="ttabs"></div></div>
+      <div class="tw"><table id="trades"></table></div>
+    </div>
+
+    <footer>
+      <div><b>Phương pháp.</b> R = lời/lỗ ÷ (số dư lúc vào lệnh × % rủi ro của chiến lược). Tăng trưởng tính theo kiểu time-weighted, đã loại nạp/rút. Giờ hiển thị theo giờ Việt Nam. Tài khoản cent được quy đổi sang USD (100 USC = 1 USD).</div>
+      <div>Kết quả quá khứ không đảm bảo kết quả tương lai. Đây không phải lời khuyên đầu tư.</div>
+    </footer>
+  </main>
 </div>
 
 <script>
 const BOTS={
-  260911:{name:'Vàng',risk:1.5,color:'--gold',ws:12,dd:15,m6:-12,stop:20,bwin:40,br:0.34},
-  260912:{name:'USDJPY',risk:1,color:'--jpy',ws:8,dd:18,m6:-11,stop:23,bwin:41,br:0.28},
-  260914:{name:'BTC',risk:1,color:'--btc',ws:4,dd:10,m6:-7,stop:13,bwin:44,br:1.8}};
+  260911:{name:'Vàng',code:'XAU · Kijun M15',risk:1.5,color:'--gold',ws:12,dd:15,m6:-12,stop:20,bwin:40,br:0.34},
+  260912:{name:'USDJPY',code:'London Breakout M15',risk:1,color:'--jpy',ws:8,dd:18,m6:-11,stop:23,bwin:41,br:0.28},
+  260914:{name:'Bitcoin',code:'Trend H4 · chỉ mua',risk:1,color:'--btc',ws:4,dd:10,m6:-7,stop:13,bwin:44,br:1.8}};
 const MAGS=Object.keys(BOTS).map(Number);
 const LS={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const $=id=>document.getElementById(id);
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-const fmt=(x,d=2)=>x==null||!isFinite(x)?'—':x.toLocaleString('vi-VN',{minimumFractionDigits:d,maximumFractionDigits:d});
-const sgn=(x,d=2)=>x==null||!isFinite(x)?'—':(x>0?'+':'')+fmt(x,d);
+const fmt=(x,d=2)=>x==null||!isFinite(x)?'—':x.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+const sgn=(x,d=2)=>x==null||!isFinite(x)?'—':(x>0?'+':x<0?'−':'')+fmt(Math.abs(x),d);
 const cls=x=>x>0?'up':x<0?'down':'';
 const tz='Asia/Ho_Chi_Minh';
 const dfmt=new Intl.DateTimeFormat('vi-VN',{timeZone:tz,day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
-const mkey=ms=>{const p=new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit'}).format(new Date(ms));return p.slice(0,7)};
-let RAW=null,chart=null,view='acc',tradeFilter='all',DEMO=false;
+const dshort=new Intl.DateTimeFormat('vi-VN',{timeZone:tz,day:'2-digit',month:'2-digit',year:'numeric'});
+const mkey=ms=>new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit'}).format(new Date(ms)).slice(0,7);
+let RAW=null,chart=null,view='acc',tradeFilter='all',DEMO=false,range=LS.get('ea_range')||'all';
 
 /* ---------- data ---------- */
 async function fetchData(url,pass){
   const r=await fetch(url,{method:'POST',body:JSON.stringify({act:'read',pass})});
   const j=await r.json();
-  if(!j.ok) throw new Error(j.err==='pass'?'Sai mật khẩu':'Lỗi máy chủ: '+(j.err||''));
+  if(!j.ok) throw new Error(j.err==='pass'?'Mật khẩu không đúng.':'Máy chủ báo lỗi: '+(j.err||''));
   return j;
 }
 function analyse(D,fromMs){
@@ -156,16 +221,12 @@ function analyse(D,fromMs){
   const F=/USC|CENT/i.test(snap.cur||'')?100:1, off=snap.off||0;
   const deals=D.deals.map(r=>({k:+r[0],t:(+r[1]-off)*1000,ty:+r[2],en:+r[3],m:+r[4],p:+r[5],s:String(r[6]),v:+r[7],pr:+r[8],amt:(+r[9])+(+r[10])+(+r[11])+(+r[12]),rs:+r[13]}))
     .sort((a,b)=>a.t-b.t||a.k-b.k);
-  let bal=0,idx=1,net=0; const idxS=[], pos={};
+  let bal=0,idx=1; const idxS=[], pos={};
   for(const d of deals){
     d.before=bal; bal+=d.amt;
-    if(d.ty<=1){
-      if(d.before>0&&d.amt) idx*=1+d.amt/d.before;
-      (pos[d.p]=pos[d.p]||[]).push(d);
-    } else if(d.ty===2) net+=d.amt;
-    d.idx=idx; idxS.push([d.t,idx]);
+    if(d.ty<=1){ if(d.before>0&&d.amt) idx*=1+d.amt/d.before; (pos[d.p]=pos[d.p]||[]).push(d); }
+    idxS.push([d.t,idx]);
   }
-  // closed positions
   const trades=[];
   for(const p in pos){
     const L=pos[p], ins=L.filter(d=>d.en===0), outs=L.filter(d=>d.en===1||d.en===3);
@@ -175,18 +236,15 @@ function analyse(D,fromMs){
     if(vout+1e-9<vin) continue;
     const pnl=L.reduce((a,d)=>a+d.amt,0), last=outs[outs.length-1];
     const R=ins[0].before>0?pnl/(ins[0].before*BOTS[m].risk/100):0;
-    trades.push({m,sym:ins[0].s,side:ins[0].ty===0?'MUA':'BÁN',vol:vin,open:ins[0].t,close:last.t,op:ins[0].pr,cp:last.pr,pnl:pnl/F,R,rs:last.rs});
+    trades.push({m,sym:ins[0].s,side:ins[0].ty===0?'Mua':'Bán',vol:vin,open:ins[0].t,close:last.t,op:ins[0].pr,cp:last.pr,pnl:pnl/F,R,rs:last.rs});
   }
   trades.sort((a,b)=>a.close-b.close);
   const T=trades.filter(t=>t.close>=fromMs);
-  // account curve from start
   const startIdx=(idxS.filter(x=>x[0]<fromMs).pop()||[0,1])[1];
   const curve=idxS.filter(x=>x[0]>=fromMs).map(x=>[x[0],(x[1]/startIdx-1)*100]);
-  let peak=-1e9,maxdd=0; for(const [,v] of curve){const q=1+v/100; peak=Math.max(peak,q); maxdd=Math.max(maxdd,1-q/peak)}
-  if(peak<1) peak=1;
+  let peak=1,maxdd=0; for(const [,v] of curve){const q=1+v/100; peak=Math.max(peak,q); maxdd=Math.max(maxdd,1-q/peak)}
   const nowBalIdx=idx/startIdx, nowEqIdx=snap.bal>0?nowBalIdx*snap.eq/snap.bal:nowBalIdx;
-  const curDD=Math.max(0,1-nowEqIdx/Math.max(peak,1));
-  // per bot
+  const curDD=Math.max(0,1-nowEqIdx/peak);
   const now=Date.now(), bots={};
   for(const m of MAGS){
     const t=T.filter(x=>x.m===m), R=t.map(x=>x.R);
@@ -198,98 +256,110 @@ function analyse(D,fromMs){
     bots[m]={n:t.length,win:t.length?R.filter(r=>r>0).length/t.length*100:null,usd:t.reduce((a,x)=>a+x.pnl,0),R:cum,avg:t.length?cum/t.length:null,
       pf:gl>0?gp/gl:(gp>0?Infinity:null),dd:pk-cum,mdd,cs,ms,r6,status:status(m,pk-cum,cs,r6,t.length)};
   }
-  // monthly
   const months={};
   for(const x of T){const k=mkey(x.close); const o=months[k]=months[k]||{}; o[x.m]=o[x.m]||{R:0,usd:0,n:0}; o[x.m].R+=x.R; o[x.m].usd+=x.pnl; o[x.m].n++}
   const mIdx={}; let prev=1; const keys=[...new Set(curve.map(c=>mkey(c[0])))];
   for(const k of keys){const last=curve.filter(c=>mkey(c[0])===k).pop(); const v=1+last[1]/100; mIdx[k]=(v/prev-1)*100; prev=v}
   const deposits=deals.filter(d=>d.ty===2&&d.t>=fromMs).reduce((a,d)=>a+d.amt,0)/F;
-  return {F,snap,trades:T,allTrades:trades,curve,maxdd,curDD,growth:(nowBalIdx-1)*100,growthEq:(nowEqIdx-1)*100,bots,months,mIdx,net:net/F,deposits,
-    closedUsd:T.reduce((a,x)=>a+x.pnl,0),bal:snap.bal/F,eq:snap.eq/F,firstTrade:trades.length?trades[0].open:null};
+  return {F,snap,trades:T,curve,maxdd,curDD,growth:(nowBalIdx-1)*100,growthEq:(nowEqIdx-1)*100,bots,months,mIdx,deposits,
+    closedUsd:T.reduce((a,x)=>a+x.pnl,0),bal:snap.bal/F,eq:snap.eq/F};
 }
 function status(m,dd,cs,r6,n){
   const B=BOTS[m];
-  if(n<1) return ['Chưa có lệnh','b-new',''];
-  if(dd>B.stop||cs>=Math.ceil(B.ws*1.5)) return ['Cần dừng & xem lại','b-stop',`Sụt ${fmt(dd,1)}R / ngưỡng dừng ${B.stop}R, thua liền ${cs}`];
-  if(dd>B.dd||cs>B.ws||r6<B.m6) return ['Vượt mức lịch sử','b-bad','Đã tệ hơn mức xấu nhất backtest — xem lại theo 4 bước'];
-  if(dd>=0.7*B.dd||cs>=Math.ceil(0.7*B.ws)) return ['Chú ý','b-warn','Gần mức xấu nhất từng có — vẫn trong lịch sử'];
-  return ['Bình thường','b-ok',''];
+  if(n<1) return ['Chưa giao dịch','p-new',''];
+  if(dd>B.stop||cs>=Math.ceil(B.ws*1.5)) return ['Dừng & rà soát','p-stop',`${B.name}: sụt ${fmt(dd,1)}R vượt ngưỡng dừng ${B.stop}R hoặc chuỗi thua quá dài — tắt riêng chiến lược này và chạy lại Tester.`];
+  if(dd>B.dd||cs>B.ws||r6<B.m6) return ['Vượt lịch sử','p-bad',`${B.name}: đã tệ hơn mức xấu nhất từng có trong backtest — rà soát theo 4 bước, chạy tiếp với nửa rủi ro.`];
+  if(dd>=0.7*B.dd||cs>=Math.ceil(0.7*B.ws)) return ['Theo dõi','p-warn',`${B.name}: đang gần mức xấu nhất từng có, vẫn trong phạm vi lịch sử.`];
+  return ['Ổn định','p-ok',''];
 }
 
 /* ---------- render ---------- */
+function fromMs(){
+  const now=new Date();
+  if(range==='30') return Date.now()-30*864e5;
+  if(range==='90') return Date.now()-90*864e5;
+  if(range==='ytd') return new Date(now.getFullYear()+'-01-01T00:00:00+07:00').getTime();
+  if(range==='custom'&&$('from').value) return new Date($('from').value+'T00:00:00+07:00').getTime();
+  return 0;
+}
 function render(){
-  const fromMs=new Date(($('from').value||'2000-01-01')+'T00:00:00+07:00').getTime();
-  const A=analyse(RAW,fromMs);
-  const s=A.snap, age=s.rt?(Date.now()-s.rt)/60000:null;
-  const live=age!=null&&age<15;
-  $('upd').innerHTML=`<span class="dot" style="background:${live?css('--up'):css('--down')}"></span>`+
-    (s.rt?`MT5 gửi lúc ${dfmt.format(new Date(s.rt))} (${age<1?'vừa xong':Math.round(age)+' phút trước'})`:'Chưa có dữ liệu')+
-    (live?'':' · MT5 có thể đang tắt hoặc mất mạng')+(s.real===false?' · tài khoản demo':'');
-  // rule banner (luật dừng 20% / 25%)
-  const dd=A.curDD*100, r=$('rule');
-  if(dd>=25){r.className='rule b-stop';r.textContent=`Sụt ${fmt(dd,1)}% từ đỉnh ≥ 25% → luật đã chọn: TẮT cả 3 bot rồi xem lại.`}
-  else if(dd>=20){r.className='rule b-bad';r.textContent=`Sụt ${fmt(dd,1)}% từ đỉnh ≥ 20% → luật đã chọn: giảm rủi ro còn một nửa.`}
-  else {r.className='rule b-ok';r.textContent=`Sụt hiện tại ${fmt(dd,1)}% từ đỉnh — dưới ngưỡng 20% (giảm nửa rủi ro) và 25% (tắt bot).`}
-  // KPIs
+  [...$('range').children].forEach(b=>b.classList.toggle('on',b.dataset.r===range));
+  const A=analyse(RAW,fromMs()), s=A.snap, age=s.rt?(Date.now()-s.rt)/60000:null, live=age!=null&&age<15;
+  $('upd').innerHTML=`<span class="pulse ${live?'':'off'}"></span>`+(s.rt?(live?'Trực tuyến':'Mất kết nối')+` · ${age<1?'vừa cập nhật':'cập nhật '+Math.round(age)+' phút trước'}`:'Chưa có dữ liệu')+(s.real===false?' · demo':'');
+  $('upd').title=s.rt?'MT5 gửi lúc '+dfmt.format(new Date(s.rt)):'';
+  const nPos=(s.pos||[]).filter(p=>BOTS[p[1]]).length;
   const K=[
-    ['Số dư',fmt(A.bal)+' USD',`Equity ${fmt(A.eq)} USD`],
-    ['Lời/lỗ đã chốt',`<span class="${cls(A.closedUsd)}">${sgn(A.closedUsd)} USD</span>`,`${A.trades.length} lệnh từ ${$('from').value?new Date(fromMs).toLocaleDateString('vi-VN'):'đầu'}`],
-    ['Tăng trưởng',`<span class="${cls(A.growth)}">${sgn(A.growth)}%</span>`,`tính cả lệnh đang mở: ${sgn(A.growthEq)}% · đã loại nạp/rút`],
-    ['Đang nổi',`<span class="${cls(A.eq-A.bal)}">${sgn(A.eq-A.bal)} USD</span>`,`${(s.pos||[]).filter(p=>BOTS[p[1]]).length} lệnh của bot`],
-    ['Sụt lớn nhất',`<span class="down">${fmt(A.maxdd*100,1)}%</span>`,`backtest gộp: 16.2% (p95 ~27%)`],
-    ['Nạp/rút ròng',fmt(A.deposits)+' USD','trong giai đoạn đang xem']];
-  $('kpis').innerHTML=K.map(k=>`<div class="panel kpi"><div class="l">${k[0]}</div><div class="v num">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('');
-  // bots
-  $('bots').innerHTML=MAGS.map(m=>{
-    const B=BOTS[m],b=A.bots[m],[st,sc,sn]=b.status;
-    const meter=(lab,v,max,unit)=>{const p=Math.min(100,max?v/max*100:0);const c=p>=100?'--down':p>=70?'--warn':'--up';
-      return `<div class="meter"><div style="display:flex;justify-content:space-between"><span class="sub">${lab}</span><span class="mono">${fmt(v,unit==='R'?1:0)}${unit} / ${max}${unit}</span></div><div class="bar"><i style="width:${p}%;background:${css(c)}"></i></div></div>`};
-    return `<div class="panel bot"><h3><span class="dot" style="background:${css(B.color)};width:10px;height:10px"></span>${B.name}<span class="sub" style="font-weight:400">· ${B.risk}%/lệnh</span><span class="badge ${sc}">${st}</span></h3>
-    <div class="stats">
-      <div><span>Số lệnh</span><span class="num">${b.n}</span></div>
-      <div><span>Thắng</span><span class="num">${b.win==null?'—':fmt(b.win,0)+'%'} <span class="sub">(bt ${B.bwin}%)</span></span></div>
-      <div><span>Lời/lỗ</span><span class="num ${cls(b.usd)}">${sgn(b.usd)} $</span></div>
-      <div><span>Tổng R</span><span class="num ${cls(b.R)}">${sgn(b.R,1)}R</span></div>
-      <div><span>R/lệnh</span><span class="num ${cls(b.avg)}">${sgn(b.avg)} <span class="sub">(bt ${sgn(B.br)})</span></span></div>
-      <div><span>PF</span><span class="num">${b.pf===Infinity?'∞':fmt(b.pf)}</span></div>
-      <div><span>6 tháng gần nhất</span><span class="num ${cls(b.r6)}">${sgn(b.r6,1)}R <span class="sub">(tệ nhất ${B.m6})</span></span></div>
-      <div><span>Thua liền dài nhất</span><span class="num">${b.ms}</span></div>
-    </div>
-    ${meter('Sụt từ đỉnh (R) / mức xấu nhất',b.dd,B.dd,'R')}
-    ${meter('Đang thua liền / kỷ lục',b.cs,B.ws,'')}
-    ${sn?`<div class="note">${sn}</div>`:''}${b.n&&b.n<20?`<div class="note">Mới ${b.n} lệnh — còn quá ít để kết luận.</div>`:''}</div>`}).join('');
+    ['Số dư',`${fmt(A.bal)}`,`Vốn thực ${fmt(A.eq)} USD`],
+    ['Tăng trưởng',`<span class="${cls(A.growth)}">${sgn(A.growth)}%</span>`,`Gồm lệnh mở: ${sgn(A.growthEq)}%`],
+    ['Lợi nhuận đã chốt',`<span class="${cls(A.closedUsd)}">${sgn(A.closedUsd)}</span>`,`USD · ${A.trades.length} giao dịch`],
+    ['Lãi/lỗ tạm tính',`<span class="${cls(A.eq-A.bal)}">${sgn(A.eq-A.bal)}</span>`,`USD · ${nPos} vị thế mở`],
+    ['Sụt giảm tối đa',`<span class="${A.maxdd>0?'down':''}">${A.maxdd>0?'−':''}${fmt(A.maxdd*100,1)}%</span>`,'Backtest gộp: −16.2%'],
+    ['Nạp / rút ròng',`${fmt(A.deposits)}`,'USD trong kỳ']];
+  $('kpis').innerHTML=K.map(k=>`<div><div class="eyebrow">${k[0]}</div><div class="kv">${k[1]}</div><div class="f">${k[2]}</div></div>`).join('');
+  const dd=A.curDD*100, pos=Math.min(100,dd/25*100);
+  const st=dd>=25?['p-stop','Tắt cả 3 chiến lược và rà soát']:dd>=20?['p-bad','Giảm rủi ro còn một nửa']:dd>=15?['p-warn','Theo dõi sát']:['p-ok','Trong ngưỡng an toàn'];
+  $('rule').innerHTML=`<span class="eyebrow">Sụt từ đỉnh</span><b class="mono">${dd>0?'−':''}${fmt(dd,1)}%</b>
+    <div class="gauge"><span class="t" style="left:80%"></span><span class="lb" style="left:80%">20% · giảm nửa</span><span class="lb" style="left:100%">25% · tắt</span><i style="left:calc(${pos}% - 1px)"></i></div>
+    <span class="pill ${st[0]}">${st[1]}</span>`;
+  // strategy table
+  const mbar=(v,max,unit)=>{const p=Math.min(100,max?v/max*100:0),c=p>=100?'--down':p>=70?'--warn':'--up';
+    return `<div class="mbar"><div class="b"><i style="width:${p}%;background:${css(c)}"></i></div><span class="mono">${fmt(v,unit?1:0)}${unit}/${max}${unit}</span></div>`};
+  $('bots').innerHTML=`<tr><th>Chiến lược</th><th class="n">Lệnh</th><th class="n">Tỷ lệ thắng</th><th class="n">PF</th><th class="n">R / lệnh</th><th class="n">Tổng R</th><th class="n">Lợi nhuận</th><th class="n">6 tháng</th><th>Sụt từ đỉnh</th><th>Chuỗi thua</th><th>Trạng thái</th></tr>`+
+    MAGS.map(m=>{const B=BOTS[m],b=A.bots[m];return `<tr>
+      <td class="name"><span class="sw" style="background:${css(B.color)}"></span>${B.name}<div class="sub" style="font-weight:400;margin-left:17px">${B.code} · ${B.risk}%/lệnh</div></td>
+      <td class="n">${b.n}</td>
+      <td class="n">${b.win==null?'—':fmt(b.win,0)+'%'}<div class="sub">bt ${B.bwin}%</div></td>
+      <td class="n">${b.pf===Infinity?'∞':fmt(b.pf)}</td>
+      <td class="n ${cls(b.avg)}">${sgn(b.avg)}<div class="sub">bt +${B.br}</div></td>
+      <td class="n ${cls(b.R)}">${sgn(b.R,1)}</td>
+      <td class="n ${cls(b.usd)}">${sgn(b.usd)}</td>
+      <td class="n ${cls(b.r6)}">${sgn(b.r6,1)}<div class="sub">xấu nhất ${B.m6}</div></td>
+      <td>${mbar(b.dd,B.dd,'R')}</td><td>${mbar(b.cs,B.ws,'')}</td>
+      <td><span class="pill ${b.status[1]}">${b.status[0]}</span></td></tr>`}).join('');
+  const notes=MAGS.map(m=>A.bots[m].status[2]).filter(Boolean);
+  const few=MAGS.filter(m=>A.bots[m].n>0&&A.bots[m].n<20).map(m=>BOTS[m].name);
+  if(few.length) notes.push(`${few.join(', ')}: dưới 20 giao dịch — mẫu còn quá nhỏ để đánh giá.`);
+  $('botNotes').innerHTML=notes.map(n=>`<div>${n}</div>`).join('')||'<div>Tất cả chiến lược đang trong phạm vi backtest.</div>';
   drawChart(A);
   // monthly
-  const ks=Object.keys(A.mIdx).concat(Object.keys(A.months)).filter((v,i,a)=>a.indexOf(v)===i).sort().reverse();
-  $('mon').innerHTML=`<tr><th>Tháng</th>${MAGS.map(m=>`<th class="n">${BOTS[m].name}</th>`).join('')}<th class="n">Tài khoản</th></tr>`+
-    (ks.length?ks.map(k=>`<tr><td class="mono">${k.slice(5)}/${k.slice(0,4)}</td>${MAGS.map(m=>{const o=(A.months[k]||{})[m];return `<td class="n ${o?cls(o.R):''}">${o?sgn(o.R,1)+'R <span class="sub">('+o.n+')</span>':'<span class="sub">—</span>'}</td>`}).join('')}<td class="n ${cls(A.mIdx[k])}">${A.mIdx[k]!=null?sgn(A.mIdx[k])+'%':'—'}</td></tr>`).join(''):'<tr><td colspan="5" class="sub">Chưa có lệnh</td></tr>');
+  const ks=[...new Set(Object.keys(A.mIdx).concat(Object.keys(A.months)))].sort().reverse();
+  const heat=v=>{if(v==null||!isFinite(v)||v===0) return '';const a=Math.min(.9,.15+Math.abs(v)/8);return `background:color-mix(in srgb, ${css(v>0?'--up':'--down')} ${Math.round(a*35)}%, transparent)`};
+  $('mon').innerHTML=`<tr><th>Tháng</th>${MAGS.map(m=>`<th class="n">${BOTS[m].name}</th>`).join('')}<th class="n">Danh mục</th></tr>`+
+    (ks.length?ks.map(k=>`<tr><td class="mono">${k.slice(5)}/${k.slice(0,4)}</td>${MAGS.map(m=>{const o=(A.months[k]||{})[m];return `<td class="n ${o?cls(o.R):''}">${o?sgn(o.R,1)+'R':'<span class="mute">·</span>'}</td>`}).join('')}<td class="n heat ${cls(A.mIdx[k])}" style="${heat(A.mIdx[k])}">${A.mIdx[k]!=null?sgn(A.mIdx[k])+'%':'—'}</td></tr>`).join(''):'<tr><td colspan="5" class="mute">Chưa có dữ liệu</td></tr>');
   // open positions
   const op=(s.pos||[]).filter(p=>BOTS[p[1]]);
-  $('open').innerHTML=`<tr><th>Bot</th><th>Lệnh</th><th class="n">Lot</th><th class="n">Giá vào</th><th class="n">SL</th><th class="n">Đang nổi</th><th class="n">R</th></tr>`+
+  $('open').innerHTML=`<tr><th>Chiến lược</th><th>Lệnh</th><th class="n">Lot</th><th class="n">Giá vào</th><th class="n">Dừng lỗ</th><th class="n">Tạm tính</th><th class="n">R</th></tr>`+
     (op.length?op.map(p=>{const fl=p[7]/A.F, R=A.bal>0?fl/(A.bal*BOTS[p[1]].risk/100):0;
-      return `<tr><td>${BOTS[p[1]].name}</td><td>${p[3]===0?'MUA':'BÁN'} ${p[2]}</td><td class="n">${fmt(p[4])}</td><td class="n">${p[5]}</td><td class="n">${+p[6]?p[6]:'—'}</td><td class="n ${cls(fl)}">${sgn(fl)} $</td><td class="n ${cls(R)}">${sgn(R)}</td></tr>`}).join(''):'<tr><td colspan="7" class="sub">Không có lệnh nào đang mở</td></tr>');
+      return `<tr><td class="name"><span class="sw" style="background:${css(BOTS[p[1]].color)}"></span>${BOTS[p[1]].name}</td><td>${p[3]===0?'Mua':'Bán'} <span class="mute">${p[2]}</span></td><td class="n">${fmt(p[4])}</td><td class="n">${p[5]}</td><td class="n">${+p[6]?p[6]:'—'}</td><td class="n ${cls(fl)}">${sgn(fl)}</td><td class="n ${cls(R)}">${sgn(R)}</td></tr>`}).join(''):'<tr><td colspan="7" class="mute">Không có vị thế mở</td></tr>');
   const other=(s.pos||[]).length-op.length;
-  $('openNote').textContent=other>0?`Ngoài ra có ${other} lệnh không thuộc 3 bot (đánh tay hoặc EA khác).`:'';
+  $('openNote').textContent=other>0?`+${other} vị thế ngoài danh mục`:'';
   // trades
   $('ttabs').innerHTML=[['all','Tất cả'],...MAGS.map(m=>[String(m),BOTS[m].name])].map(([k,l])=>`<button class="tab ${tradeFilter===k?'on':''}" data-k="${k}">${l}</button>`).join('');
-  const why={3:'bot đóng',4:'chạm SL',5:'chạm TP',6:'stop out',0:'đóng tay',1:'đóng tay (ĐT)',2:'đóng tay (web)'};
-  const tl=A.trades.filter(t=>tradeFilter==='all'||String(t.m)===tradeFilter).slice().reverse().slice(0,60);
-  $('trades').innerHTML=`<tr><th>Đóng lúc (VN)</th><th>Bot</th><th>Lệnh</th><th class="n">Lot</th><th class="n">Vào</th><th class="n">Ra</th><th>Lý do</th><th class="n">Giữ</th><th class="n">Lời/lỗ</th><th class="n">R</th></tr>`+
-    (tl.length?tl.map(t=>{const h=(t.close-t.open)/36e5;return `<tr><td class="mono">${dfmt.format(new Date(t.close))}</td><td>${BOTS[t.m].name}</td><td>${t.side} ${t.sym}</td><td class="n">${fmt(t.vol)}</td><td class="n">${t.op}</td><td class="n">${t.cp}</td><td>${(why[t.rs]||'khác')+(t.rs===4&&t.pnl>0?' (đã khóa lời)':'')}</td><td class="n">${h<48?fmt(h,1)+' h':fmt(h/24,1)+' ngày'}</td><td class="n ${cls(t.pnl)}">${sgn(t.pnl)} $</td><td class="n ${cls(t.R)}">${sgn(t.R)}</td></tr>`}).join(''):'<tr><td colspan="10" class="sub">Chưa có lệnh đóng</td></tr>');
+  const why={3:'Tín hiệu thoát',4:'Dừng lỗ',5:'Chốt lời',6:'Stop out',0:'Thủ công',1:'Thủ công',2:'Thủ công'};
+  const all=A.trades.filter(t=>tradeFilter==='all'||String(t.m)===tradeFilter), tl=all.slice().reverse().slice(0,80);
+  $('tcount').textContent=all.length>80?`80 / ${all.length} giao dịch gần nhất`:`${all.length} giao dịch`;
+  $('trades').innerHTML=`<tr><th>Thời điểm đóng</th><th>Chiến lược</th><th>Lệnh</th><th class="n">Khối lượng</th><th class="n">Giá vào</th><th class="n">Giá ra</th><th>Lý do</th><th class="n">Thời gian giữ</th><th class="n">Lợi nhuận (USD)</th><th class="n">R</th></tr>`+
+    (tl.length?tl.map(t=>{const h=(t.close-t.open)/36e5;return `<tr><td class="mono">${dfmt.format(new Date(t.close))}</td><td class="name"><span class="sw" style="background:${css(BOTS[t.m].color)}"></span>${BOTS[t.m].name}</td><td>${t.side} <span class="mute">${t.sym}</span></td><td class="n">${fmt(t.vol)}</td><td class="n">${t.op}</td><td class="n">${t.cp}</td><td>${(why[t.rs]||'Khác')+(t.rs===4&&t.pnl>0?' (đã khóa lãi)':'')}</td><td class="n">${h<48?fmt(h,1)+' giờ':fmt(h/24,1)+' ngày'}</td><td class="n ${cls(t.pnl)}">${sgn(t.pnl)}</td><td class="n ${cls(t.R)}">${sgn(t.R)}</td></tr>`}).join(''):'<tr><td colspan="10" class="mute">Chưa có giao dịch trong kỳ</td></tr>');
 }
 function drawChart(A){
   const c=$('ch'); if(chart) chart.destroy();
-  const grid=css('--line'), ink=css('--mute');
-  let ds=[];
+  const grid=css('--line'), ink=css('--mute'), unit=view==='acc'?'%':view==='r'?'R':' USD';
+  let ds;
   if(view==='acc'){
-    ds=[{label:'Tài khoản %',data:A.curve.map(([t,v])=>({x:t,y:v})),borderColor:css('--accent'),backgroundColor:css('--accent')+'22',fill:true,pointRadius:0,tension:0,borderWidth:2,stepped:true}];
+    const ctx=c.getContext('2d'), g=ctx.createLinearGradient(0,0,0,320), ac=css('--accent');
+    g.addColorStop(0,`color-mix(in srgb, ${ac} 22%, transparent)`); g.addColorStop(1,`color-mix(in srgb, ${ac} 0%, transparent)`);
+    let gr; try{gr=g}catch(e){gr='transparent'}
+    ds=[{label:'Danh mục',data:A.curve.map(([t,v])=>({x:t,y:v})),borderColor:ac,backgroundColor:ac+'22',fill:'origin',pointRadius:0,borderWidth:2,stepped:true}];
   } else {
-    ds=MAGS.map(m=>{let c=0;const t=A.trades.filter(x=>x.m===m);return {label:BOTS[m].name,data:[{x:A.trades.length?A.trades[0].open:Date.now(),y:0},...t.map(x=>({x:x.close,y:(c+=view==='r'?x.R:x.pnl)}))],borderColor:css(BOTS[m].color),backgroundColor:css(BOTS[m].color),pointRadius:2,stepped:true,borderWidth:2}});
+    const t0=A.trades.length?A.trades[0].open:Date.now();
+    ds=MAGS.map(m=>{let cu=0;const t=A.trades.filter(x=>x.m===m);return {label:BOTS[m].name,data:[{x:t0,y:0},...t.map(x=>({x:x.close,y:(cu+=view==='r'?x.R:x.pnl)}))],borderColor:css(BOTS[m].color),backgroundColor:css(BOTS[m].color),pointRadius:0,pointHoverRadius:4,stepped:true,borderWidth:2}});
   }
   chart=new Chart(c,{type:'line',data:{datasets:ds},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'nearest',intersect:false},
-    plugins:{legend:{display:view!=='acc',labels:{color:ink,boxWidth:12}},tooltip:{callbacks:{title:i=>dfmt.format(new Date(i[0].parsed.x)),label:i=>`${i.dataset.label}: ${sgn(i.parsed.y)}${view==='acc'?'%':view==='r'?'R':' $'}`}}},
-    scales:{x:{type:'linear',max:Date.now(),ticks:{color:ink,maxTicksLimit:7,callback:v=>new Intl.DateTimeFormat('vi-VN',{timeZone:tz,day:'2-digit',month:'2-digit'}).format(new Date(v))},grid:{color:grid}},
-      y:{ticks:{color:ink,callback:v=>v+(view==='acc'?'%':view==='r'?'R':'')},grid:{color:grid}}}}});
+    plugins:{legend:{display:view!=='acc',position:'top',align:'end',labels:{color:ink,boxWidth:10,boxHeight:10,font:{family:'IBM Plex Sans',size:12}}},
+      tooltip:{backgroundColor:css('--ink'),titleColor:css('--panel'),bodyColor:css('--panel'),padding:10,cornerRadius:6,titleFont:{family:'IBM Plex Mono'},bodyFont:{family:'IBM Plex Mono'},
+        callbacks:{title:i=>dfmt.format(new Date(i[0].parsed.x)),label:i=>` ${i.dataset.label}: ${sgn(i.parsed.y)}${unit}`}}},
+    scales:{x:{type:'linear',max:Date.now(),border:{display:false},ticks:{color:ink,maxTicksLimit:8,font:{family:'IBM Plex Mono',size:11},callback:v=>new Intl.DateTimeFormat('vi-VN',{timeZone:tz,day:'2-digit',month:'2-digit'}).format(new Date(v))},grid:{display:false}},
+      y:{position:'right',border:{display:false},ticks:{color:ink,font:{family:'IBM Plex Mono',size:11},callback:v=>v+(unit.trim()==='USD'?'':unit)},grid:{color:grid}}}}});
 }
 
 /* ---------- demo data ---------- */
@@ -315,23 +385,24 @@ async function load(){
   if(DEMO){RAW=demoData();show();return}
   const url=LS.get('ea_url'),pass=LS.get('ea_pass');
   if(!url||!pass){$('login').classList.remove('hidden');$('app').classList.add('hidden');return}
-  $('upd').textContent='Đang tải…';
-  try{RAW=await fetchData(url,pass);show()}catch(e){LS.del('ea_pass');$('login').classList.remove('hidden');$('app').classList.add('hidden');$('err').textContent=e.message||'Không tải được'}
+  try{RAW=await fetchData(url,pass);show()}catch(e){LS.del('ea_pass');$('login').classList.remove('hidden');$('app').classList.add('hidden');$('err').textContent=e.message||'Không tải được dữ liệu.'}
 }
 function show(){
   $('login').classList.add('hidden');$('app').classList.remove('hidden');$('demoTag').classList.toggle('hidden',!DEMO);
-  if(!$('from').value){const f=LS.get('ea_from');if(f)$('from').value=f}
+  const f=LS.get('ea_from'); if(f&&!$('from').value) $('from').value=f;
   render();
 }
-$('go').onclick=()=>{const u=$('u').value.trim(),p=$('p').value;if(!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(u)){$('err').textContent='Link phải có dạng https://script.google.com/macros/s/…/exec';return}
-  LS.set('ea_url',u);LS.set('ea_pass',p);$('err').textContent='';DEMO=false;load()};
+$('go').onclick=()=>{const u=$('u').value.trim(),p=$('p').value;if(!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(u)){$('err').textContent='Địa chỉ phải có dạng https://script.google.com/macros/s/…/exec';return}
+  LS.set('ea_url',u);LS.set('ea_pass',p);$('err').textContent='';DEMO=false;if(location.hash)location.hash='';load()};
 $('p').addEventListener('keydown',e=>{if(e.key==='Enter')$('go').click()});
-$('out').onclick=()=>{LS.del('ea_pass');if(DEMO){location.hash='';DEMO=false};$('p').value='';load()};
+$('out').onclick=()=>{LS.del('ea_pass');$('p').value='';if(DEMO){DEMO=false;location.hash=''}else load()};
 $('reload').onclick=load;
-$('from').onchange=()=>{LS.set('ea_from',$('from').value);render()};
+$('range').onclick=e=>{const b=e.target.closest('button');if(!b)return;range=b.dataset.r;LS.set('ea_range',range);render()};
+$('from').onchange=()=>{LS.set('ea_from',$('from').value);range=$('from').value?'custom':'all';LS.set('ea_range',range);render()};
 $('ctabs').onclick=e=>{const b=e.target.closest('.tab');if(!b)return;view=b.dataset.v;[...$('ctabs').children].forEach(x=>x.classList.toggle('on',x===b));render()};
 $('ttabs').onclick=e=>{const b=e.target.closest('.tab');if(!b)return;tradeFilter=b.dataset.k;render()};
 window.addEventListener('hashchange',()=>{DEMO=location.hash==='#demo';load()});
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>RAW&&render());
 DEMO=location.hash==='#demo';
 $('u').value=LS.get('ea_url')||'';
 load();
