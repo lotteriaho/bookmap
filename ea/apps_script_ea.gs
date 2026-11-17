@@ -4,8 +4,15 @@
  *   WRITE_KEY = mã ghi, điền giống ô InpKey của EA StatsSync
  *   VIEW_PASS = mật khẩu xem trang thống kê
  * Deploy > New deployment > Web app: Execute as = Me, Who has access = Anyone.
+ * Nhiều tài khoản: EA gửi "acc" (vd exness / ftmo). exness dùng tab deals/snap/equity,
+ * tài khoản khác dùng tab deals_<acc>, snap_<acc>, equity_<acc>.
  */
 var COLS = ['ticket','time','type','entry','magic','position','symbol','volume','price','profit','swap','commission','fee','reason'];
+
+function sfx_(acc) {
+  acc = String(acc || 'exness').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return (!acc || acc === 'exness') ? '' : '_' + acc;
+}
 
 function doPost(e) {
   var b;
@@ -14,11 +21,11 @@ function doPost(e) {
   if (b.act === 'push') {
     if (!P.getProperty('WRITE_KEY') || b.key !== P.getProperty('WRITE_KEY')) return out_({ok:false, err:'key'});
     var lock = LockService.getScriptLock(); lock.waitLock(20000);
-    try { return out_(push_(b)); } finally { lock.releaseLock(); }
+    try { return out_(push_(b, sfx_(b.acc))); } finally { lock.releaseLock(); }
   }
   if (b.act === 'read') {
     if (!P.getProperty('VIEW_PASS') || b.pass !== P.getProperty('VIEW_PASS')) { Utilities.sleep(1500); return out_({ok:false, err:'pass'}); }
-    return out_(read_());
+    return out_(read_(sfx_(b.acc)));
   }
   return out_({ok:false, err:'act'});
 }
@@ -32,8 +39,8 @@ function sh_(name, header) {
   return s;
 }
 
-function push_(b) {
-  var s = sh_('deals', COLS);
+function push_(b, x) {
+  var s = sh_('deals' + x, COLS);
   var have = {};
   var n = s.getLastRow();
   if (n > 1) s.getRange(2, 1, n - 1, 1).getValues().forEach(function (r) { have[String(r[0])] = 1; });
@@ -47,20 +54,20 @@ function push_(b) {
   if (rows.length) s.getRange(s.getLastRow() + 1, 1, rows.length, COLS.length).setValues(rows);
   if (b.snap) {
     b.snap.rt = Date.now();
-    sh_('snap').getRange(1, 1).setValue(JSON.stringify(b.snap));
-    var q = sh_('equity', ['t','balance','equity']);
+    sh_('snap' + x).getRange(1, 1).setValue(JSON.stringify(b.snap));
+    var q = sh_('equity' + x, ['t','balance','equity']);
     var last = q.getLastRow() > 1 ? Number(q.getRange(q.getLastRow(), 1).getValue()) : 0;
     if (Date.now() - last > 50 * 60 * 1000) q.appendRow([Date.now(), b.snap.bal, b.snap.eq]);
   }
   return {ok:true, added:rows.length};
 }
 
-function read_() {
-  var s = sh_('deals', COLS);
+function read_(x) {
+  var s = sh_('deals' + x, COLS);
   var n = s.getLastRow();
   var deals = n > 1 ? s.getRange(2, 1, n - 1, COLS.length).getValues() : [];
-  var snapTxt = sh_('snap').getRange(1, 1).getValue();
-  var q = sh_('equity', ['t','balance','equity']);
+  var snapTxt = sh_('snap' + x).getRange(1, 1).getValue();
+  var q = sh_('equity' + x, ['t','balance','equity']);
   var m = q.getLastRow();
   var eq = m > 1 ? q.getRange(Math.max(2, m - 6000), 1, Math.min(m - 1, 6000), 3).getValues() : [];
   return {ok:true, cols:COLS, deals:deals, snap: snapTxt ? JSON.parse(snapTxt) : null, equity:eq};

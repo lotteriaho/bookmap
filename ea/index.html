@@ -140,8 +140,6 @@ footer{font-size:12px;color:var(--mute);margin-top:18px;line-height:1.6}
     <div class="mark">EA</div>
     <h1>Hiệu suất Danh mục EA</h1>
     <div class="mute" style="font-size:13px">Báo cáo giao dịch thực tế · Vàng · USDJPY · Bitcoin</div>
-    <label>Tài khoản</label>
-    <div class="seg acc" id="accLogin"></div>
     <label for="u">Địa chỉ nguồn dữ liệu (Apps Script)</label>
     <input id="u" autocomplete="off" spellcheck="false" placeholder="Dán link …/exec hoặc ID triển khai AKfy…">
     <label for="p">Mật khẩu</label>
@@ -227,7 +225,7 @@ let RAW=null,chart=null,view='acc',tradeFilter='all',DEMO=false,range='ea';
 
 /* ---------- data ---------- */
 async function fetchData(url,pass){
-  const r=await fetch(url,{method:'POST',body:JSON.stringify({act:'read',pass})});
+  const r=await fetch(url,{method:'POST',body:JSON.stringify({act:'read',pass,acc:ACC})});
   const j=await r.json();
   if(!j.ok) throw new Error(j.err==='pass'?'Mật khẩu không đúng.':'Máy chủ báo lỗi: '+(j.err||''));
   return j;
@@ -386,6 +384,7 @@ function zoneMidnight(z){
   const h=+(off[1]||0), mi=+(off[2]||0)*(h<0?-1:1); return g-(h*60+mi)*60000;
 }
 function ftmoPanel(A){
+  if(!A.snap||!A.snap.rt) return `<div style="grid-column:1/-1" class="sub">Chưa có dữ liệu FTMO — gắn StatsSync trên MT5 FTMO với InpAccount = ftmo (cùng link …/exec và mã ghi như Exness).</div>`;
   const R=ACCS[ACC].ftmo, dep=A.deals.find(d=>d.ty===2&&d.amt>0), init=dep?dep.amt/A.F:100000;
   const mid=zoneMidnight(R.tz); let dayBal=0; for(const d of A.deals){ if(d.t<mid) dayBal+=d.amt } dayBal/=A.F;
   const eq=A.eq, prof=eq-init, tgt=init*R.target/100, dLim=init*R.daily/100, mLim=init*R.max/100;
@@ -426,16 +425,16 @@ function demoData(){
 function applyAcc(){
   for(const m of MAGS) BOTS[m].risk=ACCS[ACC].risk[m];
   const segs=Object.keys(ACCS).map(k=>`<button data-a="${k}" class="${k===ACC?'on':''}">${ACCS[k].label}</button>`).join('');
-  $('accTop').innerHTML=segs; $('accLogin').innerHTML=segs;
+  $('accTop').innerHTML=segs;
   $('brandSub').textContent=ACCS[ACC].sub;
-  $('u').value=LS.get('ea_url_'+ACC)||''; $('p').value='';
+  $('u').value=LS.get('ea_url')||'';
 }
 function setAcc(a){ if(!ACCS[a]||a===ACC) return; ACC=a; LS.set('ea_acc',a); RAW=null; applyAcc(); $('err').textContent=''; load(); }
 async function load(){
   if(DEMO){RAW=demoData();show();return}
-  const url=LS.get('ea_url_'+ACC),pass=LS.get('ea_pass_'+ACC);
+  const url=LS.get('ea_url'),pass=LS.get('ea_pass');
   if(!url||!pass){$('login').classList.remove('hidden');$('app').classList.add('hidden');return}
-  try{RAW=await fetchData(url,pass);show()}catch(e){LS.del('ea_pass_'+ACC);$('login').classList.remove('hidden');$('app').classList.add('hidden');$('err').textContent=e.message||'Không tải được dữ liệu.'}
+  try{RAW=await fetchData(url,pass);show()}catch(e){if(/Mật khẩu/.test(e.message||''))LS.del('ea_pass');$('login').classList.remove('hidden');$('app').classList.add('hidden');$('err').textContent=e.message||'Không tải được dữ liệu.'}
 }
 function show(){
   $('login').classList.add('hidden');$('app').classList.remove('hidden');$('demoTag').classList.toggle('hidden',!DEMO);
@@ -446,9 +445,9 @@ $('go').onclick=()=>{let u=$('u').value.trim().replace(/\s+/g,''),p=$('p').value
   const mm=u.match(/script\.google\.com\/(?:a\/[^/]+\/)?macros\/s\/([\w-]+)/); if(mm) u='https://script.google.com/macros/s/'+mm[1]+'/exec';
   if(!mm&&!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(u)){$('err').textContent='Chưa có địa chỉ nguồn dữ liệu. Dán link …/exec (hoặc ID triển khai AKfy…) vào ô phía trên.';$('u').focus();return}
   if(!p){$('err').textContent='Nhập mật khẩu xem.';return}
-  LS.set('ea_url_'+ACC,u);LS.set('ea_pass_'+ACC,p);$('err').textContent='';DEMO=false;if(location.hash)location.hash='';load()};
+  LS.set('ea_url',u);LS.set('ea_pass',p);$('err').textContent='';DEMO=false;if(location.hash)location.hash='';load()};
 $('p').addEventListener('keydown',e=>{if(e.key==='Enter')$('go').click()});
-$('out').onclick=()=>{LS.del('ea_pass_'+ACC);$('p').value='';if(DEMO){DEMO=false;location.hash=''}else load()};
+$('out').onclick=()=>{LS.del('ea_pass');$('p').value='';if(DEMO){DEMO=false;location.hash=''}else load()};
 $('reload').onclick=load;
 $('ctabs').onclick=e=>{const b=e.target.closest('.tab');if(!b)return;view=b.dataset.v;[...$('ctabs').children].forEach(x=>x.classList.toggle('on',x===b));render()};
 $('ttabs').onclick=e=>{const b=e.target.closest('.tab');if(!b)return;tradeFilter=b.dataset.k;render()};
@@ -456,10 +455,11 @@ window.addEventListener('hashchange',()=>{DEMO=location.hash==='#demo';load()});
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>RAW&&render());
 DEMO=location.hash==='#demo';
 // chuyển dữ liệu đăng nhập cũ sang tài khoản Exness
-if(LS.get('ea_url')&&!LS.get('ea_url_exness')){LS.set('ea_url_exness',LS.get('ea_url'));if(LS.get('ea_pass'))LS.set('ea_pass_exness',LS.get('ea_pass'));LS.del('ea_url');LS.del('ea_pass')}
+if(!LS.get('ea_url')&&LS.get('ea_url_exness')){LS.set('ea_url',LS.get('ea_url_exness'));if(LS.get('ea_pass_exness'))LS.set('ea_pass',LS.get('ea_pass_exness'))}
+['ea_url_exness','ea_pass_exness','ea_url_ftmo','ea_pass_ftmo'].forEach(k=>LS.del(k));
 ACC=ACCS[LS.get('ea_acc')]?LS.get('ea_acc'):'exness';
 const accClick=e=>{const b=e.target.closest('button');if(b)setAcc(b.dataset.a)};
-$('accTop').onclick=accClick; $('accLogin').onclick=accClick;
+$('accTop').onclick=accClick;
 applyAcc();
 load();
 setInterval(()=>{if(!DEMO&&RAW&&!document.hidden)load()},5*60000);

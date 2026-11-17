@@ -10,13 +10,16 @@
 //| Gửi toàn bộ deal của tài khoản (cả nạp/rút) để tính số dư đúng;   |
 //| trang web chỉ thống kê các magic của 3 bot.                       |
 //| v1.00 (17/11/2026)                                                |
+//| v1.01: InpAccount - nhieu tai khoan dung chung 1 Apps Script      |
+//|        (Exness de "exness", FTMO de "ftmo").                      |
 //+------------------------------------------------------------------+
 #property copyright "StatsSync"
-#property version   "1.00"
+#property version   "1.01"
 #property description "Dong bo lich su lenh 3 bot len Google Sheet cho trang thong ke"
 
 input string InpUrl      = "";   // Link Apps Script (.../exec)
 input string InpKey      = "";   // Ma ghi (giong WRITE_KEY trong Script Properties)
+input string InpAccount  = "exness"; // Ten tai khoan tren trang thong ke: exness / ftmo
 input int    InpEverySec = 300;  // Gui moi N giay
 input int    InpChunk    = 150;  // So deal moi lan gui
 
@@ -124,13 +127,13 @@ void Sync()
       cnt++;
       if(cnt >= InpChunk)
         {
-         ok = ok && Post("{\"act\":\"push\",\"key\":" + J(InpKey) + ",\"deals\":[" + arr + "]}");
+         ok = ok && Post("{\"act\":\"push\",\"acc\":" + J(InpAccount) + ",\"key\":" + J(InpKey) + ",\"deals\":[" + arr + "]}");
          arr = ""; cnt = 0;
          if(!ok) break;
         }
      }
    if(ok)
-      ok = Post("{\"act\":\"push\",\"key\":" + J(InpKey) + ",\"deals\":[" + arr + "],\"snap\":" + SnapJson() + "}");
+      ok = Post("{\"act\":\"push\",\"acc\":" + J(InpAccount) + ",\"key\":" + J(InpKey) + ",\"deals\":[" + arr + "],\"snap\":" + SnapJson() + "}");
    if(ok)
      {
       GlobalVariableSet(GV, (double)now);
@@ -142,7 +145,7 @@ void Sync()
 
 int OnInit()
   {
-   Print("StatsSync v1.00: gui moi ", InpEverySec, " giay. Khong vao lenh.");
+   Print("StatsSync v1.01 [", InpAccount, "]: gui moi ", InpEverySec, " giay. Khong vao lenh.");
    EventSetTimer(5);   // lan dau gui sau 5 giay
    return INIT_SUCCEEDED;
   }
