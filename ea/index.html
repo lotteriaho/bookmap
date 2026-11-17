@@ -121,6 +121,15 @@ td.name{color:var(--ink);font-weight:600}
 .login input:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
 .err{color:var(--down);font-size:13px;margin-top:12px;min-height:18px}
 .hidden{display:none!important}
+.obj{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--line)}
+.obj>div{padding:12px 18px;border-right:1px solid var(--line)}.obj>div:last-child{border-right:0}
+.obj .h{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12.5px;color:var(--ink2)}
+.obj .v{font-size:15px;font-weight:600;margin:3px 0 6px}
+.obj .b{height:6px;background:var(--sunk);border:1px solid var(--line);border-radius:6px;overflow:hidden}.obj .b i{display:block;height:100%}
+.ok-ic,.no-ic{width:18px;height:18px;border-radius:5px;display:inline-grid;place-items:center;font-size:12px;font-weight:700;color:#fff;flex:none}
+.ok-ic{background:var(--up)}.no-ic{background:var(--line2);color:var(--mute)}.bad-ic{background:var(--stop);color:#fff}
+@media(max-width:800px){.obj{grid-template-columns:repeat(2,minmax(0,1fr))}.obj>div:nth-child(2n){border-right:0}.obj>div:nth-child(-n+2){border-bottom:1px solid var(--line)}}
+.seg.acc button{padding:6px 12px}
 footer{font-size:12px;color:var(--mute);margin-top:18px;line-height:1.6}
 </style>
 </head>
@@ -131,6 +140,8 @@ footer{font-size:12px;color:var(--mute);margin-top:18px;line-height:1.6}
     <div class="mark">EA</div>
     <h1>Hiệu suất Danh mục EA</h1>
     <div class="mute" style="font-size:13px">Báo cáo giao dịch thực tế · Vàng · USDJPY · Bitcoin</div>
+    <label>Tài khoản</label>
+    <div class="seg acc" id="accLogin"></div>
     <label for="u">Địa chỉ nguồn dữ liệu (Apps Script)</label>
     <input id="u" autocomplete="off" spellcheck="false" placeholder="Dán link …/exec hoặc ID triển khai AKfy…">
     <label for="p">Mật khẩu</label>
@@ -146,11 +157,12 @@ footer{font-size:12px;color:var(--mute);margin-top:18px;line-height:1.6}
 <div id="app" class="hidden">
   <div class="top"><div class="wrap">
     <div class="mark">EA</div>
-    <div class="brand"><h1>Hiệu suất Danh mục EA</h1><div class="s">Vàng · USDJPY · Bitcoin — Exness MT5</div></div>
+    <div class="brand"><h1>Hiệu suất Danh mục EA</h1><div class="s" id="brandSub">Vàng · USDJPY · Bitcoin</div></div>
     <span id="demoTag" class="demo hidden">Dữ liệu trình diễn</span>
     <span class="sp"></span>
+    <div class="seg acc" id="accTop"></div>
     <span class="status" id="upd"><span class="pulse"></span>—</span>
-    <span class="status" id="since">—</span>
+    <span class="status" id="since" title="Số liệu tính từ ngày bot vào lệnh đầu tiên">—</span>
     <button class="btn" id="reload" title="Làm mới dữ liệu">↻</button>
     <button class="btn" id="out" title="Đăng xuất">⏻</button>
   </div></div>
@@ -159,6 +171,7 @@ footer{font-size:12px;color:var(--mute);margin-top:18px;line-height:1.6}
     <div class="card">
       <div class="strip" id="kpis"></div>
       <div class="risk" id="rule"></div>
+      <div class="obj hidden" id="ftmoObj"></div>
     </div>
 
     <div class="card sec">
@@ -196,6 +209,10 @@ const BOTS={
   260912:{name:'USDJPY',code:'London Breakout M15',risk:1,color:'--jpy',ws:8,dd:18,m6:-11,stop:23,bwin:41,br:0.28},
   260914:{name:'Bitcoin',code:'Trend H4 · chỉ mua',risk:1,color:'--btc',ws:4,dd:10,m6:-7,stop:13,bwin:44,br:1.8}};
 const MAGS=Object.keys(BOTS).map(Number);
+const ACCS={
+  exness:{label:'Exness',sub:'Exness MT5 · tài khoản cent',risk:{260911:1.5,260912:1,260914:1}},
+  ftmo:{label:'FTMO Challenge',sub:'FTMO · 100,000 USD',risk:{260911:0.75,260912:0.5,260914:0.5},ftmo:{target:5,daily:5,max:10,minDays:2,tz:'Europe/Prague'}}};
+let ACC='exness';
 const LS={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const $=id=>document.getElementById(id);
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
@@ -263,7 +280,7 @@ function analyse(D,fromMs){
   for(const k of keys){const last=curve.filter(c=>mkey(c[0])===k).pop(); const v=1+last[1]/100; mIdx[k]=(v/prev-1)*100; prev=v}
   const deposits=deals.filter(d=>d.ty===2&&d.t>=fromMs).reduce((a,d)=>a+d.amt,0)/F;
   return {F,snap,trades:T,curve,maxdd,curDD,growth:(nowBalIdx-1)*100,growthEq:(nowEqIdx-1)*100,bots,months,mIdx,deposits,
-    closedUsd:T.reduce((a,x)=>a+x.pnl,0),botFloat:botFloat/F,bal:snap.bal/F,eq:snap.eq/F};
+    deals,closedUsd:T.reduce((a,x)=>a+x.pnl,0),botFloat:botFloat/F,bal:snap.bal/F,eq:snap.eq/F};
 }
 function status(m,dd,cs,r6,n){
   const B=BOTS[m];
@@ -282,9 +299,9 @@ function fromMs(){
   return 0;
 }
 function render(){
-  const F0=fromMs(); $('since').textContent=F0?'Từ khi chạy EA · '+dshort.format(new Date(F0)):'Chưa có lệnh của bot';
+  const F0=fromMs(); $('since').textContent=F0?'Từ '+dshort.format(new Date(F0)):'Chưa có lệnh của bot';
   const A=analyse(RAW,F0), s=A.snap, age=s.rt?(Date.now()-s.rt)/60000:null, live=age!=null&&age<15;
-  $('upd').innerHTML=`<span class="pulse ${live?'':'off'}"></span>`+(s.rt?(live?'Trực tuyến':'Mất kết nối')+` · ${age<1?'vừa xong':Math.round(age)+' phút trước'}`:'Chưa có dữ liệu')+(s.real===false?' · demo':'');
+  $('upd').innerHTML=`<span class="pulse ${live?'':'off'}"></span>`+(s.rt?(live?'Trực tuyến':'Mất kết nối')+` · ${age<1?'vừa xong':Math.round(age)+' phút trước'}`:'Chưa có dữ liệu')+(s.real===false&&!ACCS[ACC].ftmo?' · demo':'');
   $('upd').title=s.rt?'MT5 gửi lúc '+dfmt.format(new Date(s.rt)):'';
   const nPos=(s.pos||[]).filter(p=>BOTS[p[1]]).length;
   const K=[
@@ -292,11 +309,13 @@ function render(){
     ['Tăng trưởng (3 bot)',`<span class="${cls(A.growth)}">${sgn(A.growth)}%</span>`,`Gồm lệnh mở: ${sgn(A.growthEq)}%`],
     ['Lợi nhuận đã chốt',`<span class="${cls(A.closedUsd)}">${sgn(A.closedUsd)}</span>`,`USD · ${A.trades.length} giao dịch`],
     ['Lãi/lỗ tạm tính',`<span class="${cls(A.botFloat)}">${sgn(A.botFloat)}</span>`,`USD · ${nPos} vị thế của bot`],
-    ['Sụt giảm tối đa',`<span class="${A.maxdd>0?'down':''}">${A.maxdd>0?'−':''}${fmt(A.maxdd*100,1)}%</span>`,'Backtest gộp: −16.2%'],
+    ['Sụt giảm tối đa',`<span class="${A.maxdd>0?'down':''}">${A.maxdd>0?'−':''}${fmt(A.maxdd*100,1)}%</span>`,ACCS[ACC].ftmo?`Giới hạn FTMO: −${ACCS[ACC].ftmo.max}%`:'Backtest gộp: −16.2%'],
     ['Nạp / rút ròng',`${fmt(A.deposits)}`,'USD trong kỳ']];
   $('kpis').innerHTML=K.map(k=>`<div><div class="eyebrow">${k[0]}</div><div class="kv">${k[1]}</div><div class="f">${k[2]}</div></div>`).join('');
   const dd=A.curDD*100, pos=Math.min(100,dd/25*100);
   const st=dd>=25?['p-stop','Tắt cả 3 chiến lược và rà soát']:dd>=20?['p-bad','Giảm rủi ro còn một nửa']:dd>=15?['p-warn','Theo dõi sát']:['p-ok','Trong ngưỡng an toàn'];
+  $('rule').classList.toggle('hidden',!!ACCS[ACC].ftmo); $('ftmoObj').classList.toggle('hidden',!ACCS[ACC].ftmo);
+  if(ACCS[ACC].ftmo) $('ftmoObj').innerHTML=ftmoPanel(A);
   $('rule').innerHTML=`<span class="eyebrow">Sụt từ đỉnh</span><b class="mono">${dd>0?'−':''}${fmt(dd,1)}%</b>
     <div class="gauge"><span class="t" style="left:80%"></span><span class="lb" style="left:80%">20% · giảm nửa</span><span class="lb" style="left:100%">25% · tắt</span><i style="left:calc(${pos}% - 1px)"></i></div>
     <span class="pill ${st[0]}">${st[1]}</span>`;
@@ -361,11 +380,34 @@ function drawChart(A){
       y:{position:'right',border:{display:false},ticks:{color:ink,font:{family:'IBM Plex Mono',size:11},callback:v=>v+(unit.trim()==='USD'?'':unit)},grid:{color:grid}}}}});
 }
 
+function zoneMidnight(z){
+  const now=new Date(), d=new Intl.DateTimeFormat('en-CA',{timeZone:z}).format(now), g=Date.parse(d+'T00:00:00Z');
+  const off=(new Intl.DateTimeFormat('en-US',{timeZone:z,timeZoneName:'shortOffset'}).formatToParts(new Date(g)).find(x=>x.type==='timeZoneName').value.match(/GMT([+-]\d+)?(?::(\d+))?/)||[]);
+  const h=+(off[1]||0), mi=+(off[2]||0)*(h<0?-1:1); return g-(h*60+mi)*60000;
+}
+function ftmoPanel(A){
+  const R=ACCS[ACC].ftmo, dep=A.deals.find(d=>d.ty===2&&d.amt>0), init=dep?dep.amt/A.F:100000;
+  const mid=zoneMidnight(R.tz); let dayBal=0; for(const d of A.deals){ if(d.t<mid) dayBal+=d.amt } dayBal/=A.F;
+  const eq=A.eq, prof=eq-init, tgt=init*R.target/100, dLim=init*R.daily/100, mLim=init*R.max/100;
+  const dLoss=Math.max(0,dayBal-eq), mLoss=Math.max(0,init-eq);
+  const days=new Set(A.deals.filter(d=>d.ty<=1).map(d=>new Intl.DateTimeFormat('en-CA',{timeZone:R.tz}).format(new Date(d.t)))).size;
+  const bar=(p,c)=>`<div class="b"><i style="width:${Math.max(0,Math.min(100,p))}%;background:${css(c)}"></i></div>`;
+  const ic=(ok,bad)=>bad?'<span class="ok-ic bad-ic">✕</span>':ok?'<span class="ok-ic">✓</span>':'<span class="no-ic">·</span>';
+  const pc=x=>fmt(x/init*100,2)+'%';
+  return [
+    ['Mục tiêu lợi nhuận +'+R.target+'%',`<span class="${cls(prof)}">${sgn(prof)} $</span> <span class="sub">/ ${fmt(tgt,0)} $</span>`,bar(prof/tgt*100,'--up'),ic(prof>=tgt,false),`Còn ${fmt(Math.max(0,tgt-prof),0)} $ (${pc(Math.max(0,tgt-prof))})`],
+    ['Lỗ trong ngày tối đa −'+R.daily+'%',`<span class="${dLoss>0?'down':''}">${dLoss>0?'−':''}${fmt(dLoss)} $</span> <span class="sub">/ ${fmt(dLim,0)} $</span>`,bar(dLoss/dLim*100,dLoss/dLim>=.7?'--down':'--warn'),ic(dLoss<dLim,dLoss>=dLim),`Tính từ 0h giờ Praha (số dư đầu ngày ${fmt(dayBal,0)} $)`],
+    ['Lỗ tối đa −'+R.max+'%',`<span class="${mLoss>0?'down':''}">${mLoss>0?'−':''}${fmt(mLoss)} $</span> <span class="sub">/ ${fmt(mLim,0)} $</span>`,bar(mLoss/mLim*100,mLoss/mLim>=.7?'--down':'--warn'),ic(mLoss<mLim,mLoss>=mLim),`Ngưỡng dừng: vốn thực dưới ${fmt(init-mLim,0)} $`],
+    ['Số ngày giao dịch tối thiểu',`${days} <span class="sub">/ ${R.minDays} ngày</span>`,bar(days/R.minDays*100,'--up'),ic(days>=R.minDays,false),'Ngày có lệnh, tính theo giờ Praha']
+  ].map(r=>`<div><div class="h"><span>${r[0]}</span>${r[3]}</div><div class="v mono">${r[1]}</div>${r[2]}<div class="sub" style="margin-top:5px">${r[4]}</div></div>`).join('');
+}
+
 /* ---------- demo data ---------- */
 function demoData(){
   let seed=7; const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
-  const deals=[]; let k=1000, bal=10000, t0=Date.UTC(2026,8,1)/1000;
-  deals.push([k++,t0,2,0,0,0,'',0,0,10000,0,0,0,0]);
+  const FT=!!ACCS[ACC].ftmo, cap=FT?100000:10000;
+  const deals=[]; let k=1000, bal=cap, t0=FT?Date.UTC(2026,9,20)/1000:Date.UTC(2026,8,1)/1000;
+  deals.push([k++,t0,2,0,0,0,'',0,0,cap,0,0,0,0]);
   const P={260911:{p:.40,w:2.4,every:14,sym:'XAUUSDc',px:3650},260912:{p:.41,w:2.0,every:7,sym:'USDJPYc',px:150},260914:{p:.44,w:4.2,every:28,sym:'BTCUSDc',px:65000}};
   for(const m of MAGS){let t=t0+86400*rnd()*5;while(t<Date.now()/1000-86400*2){
     const B=BOTS[m],q=P[m],risk=bal*B.risk/100,win=rnd()<q.p,R=win?(0.3+rnd()*q.w*1.6):-(0.85+rnd()*0.2),side=rnd()<.5?0:1;
@@ -375,16 +417,25 @@ function demoData(){
     bal+=R*risk; t+=86400*q.every*(0.4+rnd()*1.2);}}
   deals.sort((a,b)=>a[1]-b[1]);
   bal=deals.reduce((a,d)=>a+d[9],0);
-  return {ok:true,deals,equity:[],snap:{bal,eq:bal+23.4,cur:'USC',off:0,real:true,rt:Date.now()-2*60000,
-    pos:[[555,260914,'BTCUSDc',0,0.02,'91250.00','88100.00',23.4,Math.round(Date.now()/1000-86400*3)]]}};
+  const fl=FT?-180:23.4;
+  return {ok:true,deals,equity:[],snap:{bal,eq:bal+fl,cur:FT?'USD':'USC',off:0,real:FT?false:true,rt:Date.now()-2*60000,
+    pos:[[555,260914,FT?'BTCUSD':'BTCUSDc',0,FT?0.2:0.02,'91250.00','88100.00',fl,Math.round(Date.now()/1000-86400*3)]]}};
 }
 
 /* ---------- boot ---------- */
+function applyAcc(){
+  for(const m of MAGS) BOTS[m].risk=ACCS[ACC].risk[m];
+  const segs=Object.keys(ACCS).map(k=>`<button data-a="${k}" class="${k===ACC?'on':''}">${ACCS[k].label}</button>`).join('');
+  $('accTop').innerHTML=segs; $('accLogin').innerHTML=segs;
+  $('brandSub').textContent=ACCS[ACC].sub;
+  $('u').value=LS.get('ea_url_'+ACC)||''; $('p').value='';
+}
+function setAcc(a){ if(!ACCS[a]||a===ACC) return; ACC=a; LS.set('ea_acc',a); RAW=null; applyAcc(); $('err').textContent=''; load(); }
 async function load(){
   if(DEMO){RAW=demoData();show();return}
-  const url=LS.get('ea_url'),pass=LS.get('ea_pass');
+  const url=LS.get('ea_url_'+ACC),pass=LS.get('ea_pass_'+ACC);
   if(!url||!pass){$('login').classList.remove('hidden');$('app').classList.add('hidden');return}
-  try{RAW=await fetchData(url,pass);show()}catch(e){LS.del('ea_pass');$('login').classList.remove('hidden');$('app').classList.add('hidden');$('err').textContent=e.message||'Không tải được dữ liệu.'}
+  try{RAW=await fetchData(url,pass);show()}catch(e){LS.del('ea_pass_'+ACC);$('login').classList.remove('hidden');$('app').classList.add('hidden');$('err').textContent=e.message||'Không tải được dữ liệu.'}
 }
 function show(){
   $('login').classList.add('hidden');$('app').classList.remove('hidden');$('demoTag').classList.toggle('hidden',!DEMO);
@@ -395,16 +446,21 @@ $('go').onclick=()=>{let u=$('u').value.trim().replace(/\s+/g,''),p=$('p').value
   const mm=u.match(/script\.google\.com\/(?:a\/[^/]+\/)?macros\/s\/([\w-]+)/); if(mm) u='https://script.google.com/macros/s/'+mm[1]+'/exec';
   if(!mm&&!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(u)){$('err').textContent='Chưa có địa chỉ nguồn dữ liệu. Dán link …/exec (hoặc ID triển khai AKfy…) vào ô phía trên.';$('u').focus();return}
   if(!p){$('err').textContent='Nhập mật khẩu xem.';return}
-  LS.set('ea_url',u);LS.set('ea_pass',p);$('err').textContent='';DEMO=false;if(location.hash)location.hash='';load()};
+  LS.set('ea_url_'+ACC,u);LS.set('ea_pass_'+ACC,p);$('err').textContent='';DEMO=false;if(location.hash)location.hash='';load()};
 $('p').addEventListener('keydown',e=>{if(e.key==='Enter')$('go').click()});
-$('out').onclick=()=>{LS.del('ea_pass');$('p').value='';if(DEMO){DEMO=false;location.hash=''}else load()};
+$('out').onclick=()=>{LS.del('ea_pass_'+ACC);$('p').value='';if(DEMO){DEMO=false;location.hash=''}else load()};
 $('reload').onclick=load;
 $('ctabs').onclick=e=>{const b=e.target.closest('.tab');if(!b)return;view=b.dataset.v;[...$('ctabs').children].forEach(x=>x.classList.toggle('on',x===b));render()};
 $('ttabs').onclick=e=>{const b=e.target.closest('.tab');if(!b)return;tradeFilter=b.dataset.k;render()};
 window.addEventListener('hashchange',()=>{DEMO=location.hash==='#demo';load()});
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>RAW&&render());
 DEMO=location.hash==='#demo';
-$('u').value=LS.get('ea_url')||'';
+// chuyển dữ liệu đăng nhập cũ sang tài khoản Exness
+if(LS.get('ea_url')&&!LS.get('ea_url_exness')){LS.set('ea_url_exness',LS.get('ea_url'));if(LS.get('ea_pass'))LS.set('ea_pass_exness',LS.get('ea_pass'));LS.del('ea_url');LS.del('ea_pass')}
+ACC=ACCS[LS.get('ea_acc')]?LS.get('ea_acc'):'exness';
+const accClick=e=>{const b=e.target.closest('button');if(b)setAcc(b.dataset.a)};
+$('accTop').onclick=accClick; $('accLogin').onclick=accClick;
+applyAcc();
 load();
 setInterval(()=>{if(!DEMO&&RAW&&!document.hidden)load()},5*60000);
 </script>
