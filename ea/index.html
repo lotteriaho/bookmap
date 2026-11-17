@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Thống kê 3 EA</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#f4f5f2;--panel:#ffffff;--panel2:#eef0ea;--ink:#1d2320;--mute:#68716b;--line:#dde1d9;
+  --up:#13795b;--down:#c23b31;--warn:#b7791f;--accent:#2f5d50;
+  --gold:#b88a1b;--jpy:#3c6fb0;--btc:#d0702a;--tot:#1d2320;
+  --ok-bg:#e3f2ea;--warn-bg:#fbf0d9;--bad-bg:#fbe3e0;--stop-bg:#c23b31;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111513;--panel:#191e1b;--panel2:#212823;--ink:#e6ebe7;--mute:#8e9890;--line:#2b332e;
+  --up:#3cc497;--down:#f0786c;--warn:#e7b04e;--accent:#7fb9a5;
+  --gold:#e0b546;--jpy:#7aa7e6;--btc:#f09a55;--tot:#e6ebe7;
+  --ok-bg:#16302a;--warn-bg:#3a2f17;--bad-bg:#3d1f1c;--stop-bg:#b2362d;}}
+:root[data-theme="dark"]{
+  --bg:#111513;--panel:#191e1b;--panel2:#212823;--ink:#e6ebe7;--mute:#8e9890;--line:#2b332e;
+  --up:#3cc497;--down:#f0786c;--warn:#e7b04e;--accent:#7fb9a5;
+  --gold:#e0b546;--jpy:#7aa7e6;--btc:#f09a55;--tot:#e6ebe7;
+  --ok-bg:#16302a;--warn-bg:#3a2f17;--bad-bg:#3d1f1c;--stop-bg:#b2362d;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Be Vietnam Pro",system-ui,sans-serif}
+.num,td.n,.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 60px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin-bottom:18px}
+h1{font-size:22px;margin:0;font-weight:700;letter-spacing:-.01em}
+h2{font-size:15px;margin:0 0 10px;font-weight:600}
+.sub{color:var(--mute);font-size:13px}
+.sp{flex:1}
+button,select,input{font:inherit;color:var(--ink)}
+.btn{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.grid{display:grid;gap:12px}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:12px}
+.kpi .l{color:var(--mute);font-size:12.5px}
+.kpi .v{font-size:22px;font-weight:600;margin-top:2px}
+.kpi .s{font-size:12.5px;color:var(--mute)}
+.up{color:var(--up)}.down{color:var(--down)}
+.rule{margin-bottom:12px;padding:10px 14px;border-radius:10px;font-size:14px}
+.bots{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-bottom:12px}
+.bot h3{margin:0;font-size:17px;display:flex;align-items:center;gap:8px}
+.badge{font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;margin-left:auto;white-space:nowrap}
+.b-ok{background:var(--ok-bg);color:var(--up)}.b-warn{background:var(--warn-bg);color:var(--warn)}
+.b-bad{background:var(--bad-bg);color:var(--down)}.b-stop{background:var(--stop-bg);color:#fff}
+.b-new{background:var(--panel2);color:var(--mute)}
+.stats{display:grid;grid-template-columns:1fr;gap:5px;margin:12px 0 10px;font-size:13.5px}
+.stats div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--line);padding-bottom:3px}
+.stats span:first-child{color:var(--mute)}
+.meter{margin-top:8px;font-size:12.5px}
+.meter .bar{height:7px;background:var(--panel2);border-radius:9px;overflow:hidden;margin-top:3px}
+.meter .bar i{display:block;height:100%;border-radius:9px}
+.note{font-size:12.5px;color:var(--mute);margin-top:8px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:transparent;border-radius:99px;padding:3px 11px;cursor:pointer;font-size:13px}
+.tab.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.chartbox{position:relative;height:300px;margin-top:10px}
+.two{grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-bottom:12px}
+@media(max-width:860px){.two{grid-template-columns:1fr}}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{color:var(--mute);font-weight:500;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td.n,th.n{text-align:right}
+.login{max-width:420px;margin:12vh auto 0}
+.login label{display:block;font-size:13px;color:var(--mute);margin:12px 0 4px}
+.login input{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)}
+.err{color:var(--down);font-size:13px;margin-top:10px;min-height:18px}
+.demo{background:var(--warn-bg);color:var(--warn);padding:6px 12px;border-radius:8px;font-size:13px;font-weight:600}
+.hidden{display:none}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<section id="login" class="login panel hidden">
+  <h1>Thống kê 3 EA</h1>
+  <div class="sub">Vàng · USDJPY · BTC — lời/lỗ thực tế</div>
+  <label for="u">Link Apps Script (…/exec)</label>
+  <input id="u" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec">
+  <label for="p">Mật khẩu xem</label>
+  <input id="p" type="password" autocomplete="current-password">
+  <div class="row" style="margin-top:14px"><button class="btn pri" id="go">Xem thống kê</button><a class="sub" href="#demo" id="demoLink">Xem thử dữ liệu mẫu</a></div>
+  <div class="err" id="err"></div>
+</section>
+
+<section id="app" class="hidden">
+  <header>
+    <div><h1>Thống kê 3 EA</h1><div class="sub" id="upd">—</div></div>
+    <span id="demoTag" class="demo hidden">DỮ LIỆU MẪU — không phải tài khoản thật</span>
+    <span class="sp"></span>
+    <label class="sub">Tính từ <input type="date" id="from" class="btn" style="padding:4px 8px"></label>
+    <button class="btn" id="reload">Làm mới</button>
+    <button class="btn" id="out">Thoát</button>
+  </header>
+
+  <div id="rule" class="rule"></div>
+  <div class="grid kpis" id="kpis"></div>
+  <div class="grid bots" id="bots"></div>
+
+  <div class="panel" style="margin-bottom:12px">
+    <div class="row"><h2 style="margin:0">Diễn biến</h2><span class="sp"></span>
+      <div class="tabs" id="ctabs"><button class="tab on" data-v="acc">Tài khoản (%)</button><button class="tab" data-v="r">R tích lũy từng bot</button><button class="tab" data-v="usd">USD tích lũy</button></div></div>
+    <div class="chartbox"><canvas id="ch"></canvas></div>
+  </div>
+
+  <div class="grid two">
+    <div class="panel"><h2>Theo tháng</h2><div class="tw"><table id="mon"></table></div></div>
+    <div class="panel"><h2>Lệnh đang mở</h2><div class="tw"><table id="open"></table></div><div class="note" id="openNote"></div></div>
+  </div>
+
+  <div class="panel">
+    <div class="row"><h2 style="margin:0">Lệnh đã đóng</h2><span class="sp"></span><div class="tabs" id="ttabs"></div></div>
+    <div class="tw"><table id="trades"></table></div>
+  </div>
+  <div class="note" style="margin-top:14px">R = lời/lỗ ÷ (số dư lúc vào lệnh × % rủi ro của bot). "Mức xấu nhất" lấy từ backtest Strategy Tester 2020–11/2026. Số liệu quá khứ không đảm bảo tương lai.</div>
+</section>
+</div>
+
+<script>
+const BOTS={
+  260911:{name:'Vàng',risk:1.5,color:'--gold',ws:12,dd:15,m6:-12,stop:20,bwin:40,br:0.34},
+  260912:{name:'USDJPY',risk:1,color:'--jpy',ws:8,dd:18,m6:-11,stop:23,bwin:41,br:0.28},
+  260914:{name:'BTC',risk:1,color:'--btc',ws:4,dd:10,m6:-7,stop:13,bwin:44,br:1.8}};
+const MAGS=Object.keys(BOTS).map(Number);
+const LS={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+const $=id=>document.getElementById(id);
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmt=(x,d=2)=>x==null||!isFinite(x)?'—':x.toLocaleString('vi-VN',{minimumFractionDigits:d,maximumFractionDigits:d});
+const sgn=(x,d=2)=>x==null||!isFinite(x)?'—':(x>0?'+':'')+fmt(x,d);
+const cls=x=>x>0?'up':x<0?'down':'';
+const tz='Asia/Ho_Chi_Minh';
+const dfmt=new Intl.DateTimeFormat('vi-VN',{timeZone:tz,day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+const mkey=ms=>{const p=new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit'}).format(new Date(ms));return p.slice(0,7)};
+let RAW=null,chart=null,view='acc',tradeFilter='all',DEMO=false;
+
+/* ---------- data ---------- */
+async function fetchData(url,pass){
+  const r=await fetch(url,{method:'POST',body:JSON.stringify({act:'read',pass})});
+  const j=await r.json();
+  if(!j.ok) throw new Error(j.err==='pass'?'Sai mật khẩu':'Lỗi máy chủ: '+(j.err||''));
+  return j;
+}
+function analyse(D,fromMs){
+  const snap=D.snap||{bal:0,eq:0,cur:'USD',off:0,pos:[]};
+  const F=/USC|CENT/i.test(snap.cur||'')?100:1, off=snap.off||0;
+  const deals=D.deals.map(r=>({k:+r[0],t:(+r[1]-off)*1000,ty:+r[2],en:+r[3],m:+r[4],p:+r[5],s:String(r[6]),v:+r[7],pr:+r[8],amt:(+r[9])+(+r[10])+(+r[11])+(+r[12]),rs:+r[13]}))
+    .sort((a,b)=>a.t-b.t||a.k-b.k);
+  let bal=0,idx=1,net=0; const idxS=[], pos={};
+  for(const d of deals){
+    d.before=bal; bal+=d.amt;
+    if(d.ty<=1){
+      if(d.before>0&&d.amt) idx*=1+d.amt/d.before;
+      (pos[d.p]=pos[d.p]||[]).push(d);
+    } else if(d.ty===2) net+=d.amt;
+    d.idx=idx; idxS.push([d.t,idx]);
+  }
+  // closed positions
+  const trades=[];
+  for(const p in pos){
+    const L=pos[p], ins=L.filter(d=>d.en===0), outs=L.filter(d=>d.en===1||d.en===3);
+    if(!ins.length||!outs.length) continue;
+    const m=ins[0].m||outs[0].m; if(!BOTS[m]) continue;
+    const vin=ins.reduce((a,d)=>a+d.v,0), vout=outs.reduce((a,d)=>a+d.v,0);
+    if(vout+1e-9<vin) continue;
+    const pnl=L.reduce((a,d)=>a+d.amt,0), last=outs[outs.length-1];
+    const R=ins[0].before>0?pnl/(ins[0].before*BOTS[m].risk/100):0;
+    trades.push({m,sym:ins[0].s,side:ins[0].ty===0?'MUA':'BÁN',vol:vin,open:ins[0].t,close:last.t,op:ins[0].pr,cp:last.pr,pnl:pnl/F,R,rs:last.rs});
+  }
+  trades.sort((a,b)=>a.close-b.close);
+  const T=trades.filter(t=>t.close>=fromMs);
+  // account curve from start
+  const startIdx=(idxS.filter(x=>x[0]<fromMs).pop()||[0,1])[1];
+  const curve=idxS.filter(x=>x[0]>=fromMs).map(x=>[x[0],(x[1]/startIdx-1)*100]);
+  let peak=-1e9,maxdd=0; for(const [,v] of curve){const q=1+v/100; peak=Math.max(peak,q); maxdd=Math.max(maxdd,1-q/peak)}
+  if(peak<1) peak=1;
+  const nowBalIdx=idx/startIdx, nowEqIdx=snap.bal>0?nowBalIdx*snap.eq/snap.bal:nowBalIdx;
+  const curDD=Math.max(0,1-nowEqIdx/Math.max(peak,1));
+  // per bot
+  const now=Date.now(), bots={};
+  for(const m of MAGS){
+    const t=T.filter(x=>x.m===m), R=t.map(x=>x.R);
+    let cum=0,pk=0,mdd=0; for(const r of R){cum+=r;pk=Math.max(pk,cum);mdd=Math.max(mdd,pk-cum)}
+    let cs=0; for(let i=R.length-1;i>=0&&R[i]<0;i--) cs++;
+    let ms=0,s=0; for(const r of R){s=r<0?s+1:0;ms=Math.max(ms,s)}
+    const gp=R.filter(r=>r>0).reduce((a,b)=>a+b,0), gl=-R.filter(r=>r<0).reduce((a,b)=>a+b,0);
+    const r6=t.filter(x=>x.close>=now-182*864e5).reduce((a,x)=>a+x.R,0);
+    bots[m]={n:t.length,win:t.length?R.filter(r=>r>0).length/t.length*100:null,usd:t.reduce((a,x)=>a+x.pnl,0),R:cum,avg:t.length?cum/t.length:null,
+      pf:gl>0?gp/gl:(gp>0?Infinity:null),dd:pk-cum,mdd,cs,ms,r6,status:status(m,pk-cum,cs,r6,t.length)};
+  }
+  // monthly
+  const months={};
+  for(const x of T){const k=mkey(x.close); const o=months[k]=months[k]||{}; o[x.m]=o[x.m]||{R:0,usd:0,n:0}; o[x.m].R+=x.R; o[x.m].usd+=x.pnl; o[x.m].n++}
+  const mIdx={}; let prev=1; const keys=[...new Set(curve.map(c=>mkey(c[0])))];
+  for(const k of keys){const last=curve.filter(c=>mkey(c[0])===k).pop(); const v=1+last[1]/100; mIdx[k]=(v/prev-1)*100; prev=v}
+  const deposits=deals.filter(d=>d.ty===2&&d.t>=fromMs).reduce((a,d)=>a+d.amt,0)/F;
+  return {F,snap,trades:T,allTrades:trades,curve,maxdd,curDD,growth:(nowBalIdx-1)*100,growthEq:(nowEqIdx-1)*100,bots,months,mIdx,net:net/F,deposits,
+    closedUsd:T.reduce((a,x)=>a+x.pnl,0),bal:snap.bal/F,eq:snap.eq/F,firstTrade:trades.length?trades[0].open:null};
+}
+function status(m,dd,cs,r6,n){
+  const B=BOTS[m];
+  if(n<1) return ['Chưa có lệnh','b-new',''];
+  if(dd>B.stop||cs>=Math.ceil(B.ws*1.5)) return ['Cần dừng & xem lại','b-stop',`Sụt ${fmt(dd,1)}R / ngưỡng dừng ${B.stop}R, thua liền ${cs}`];
+  if(dd>B.dd||cs>B.ws||r6<B.m6) return ['Vượt mức lịch sử','b-bad','Đã tệ hơn mức xấu nhất backtest — xem lại theo 4 bước'];
+  if(dd>=0.7*B.dd||cs>=Math.ceil(0.7*B.ws)) return ['Chú ý','b-warn','Gần mức xấu nhất từng có — vẫn trong lịch sử'];
+  return ['Bình thường','b-ok',''];
+}
+
+/* ---------- render ---------- */
+function render(){
+  const fromMs=new Date(($('from').value||'2000-01-01')+'T00:00:00+07:00').getTime();
+  const A=analyse(RAW,fromMs);
+  const s=A.snap, age=s.rt?(Date.now()-s.rt)/60000:null;
+  const live=age!=null&&age<15;
+  $('upd').innerHTML=`<span class="dot" style="background:${live?css('--up'):css('--down')}"></span>`+
+    (s.rt?`MT5 gửi lúc ${dfmt.format(new Date(s.rt))} (${age<1?'vừa xong':Math.round(age)+' phút trước'})`:'Chưa có dữ liệu')+
+    (live?'':' · MT5 có thể đang tắt hoặc mất mạng')+(s.real===false?' · tài khoản demo':'');
+  // rule banner (luật dừng 20% / 25%)
+  const dd=A.curDD*100, r=$('rule');
+  if(dd>=25){r.className='rule b-stop';r.textContent=`Sụt ${fmt(dd,1)}% từ đỉnh ≥ 25% → luật đã chọn: TẮT cả 3 bot rồi xem lại.`}
+  else if(dd>=20){r.className='rule b-bad';r.textContent=`Sụt ${fmt(dd,1)}% từ đỉnh ≥ 20% → luật đã chọn: giảm rủi ro còn một nửa.`}
+  else {r.className='rule b-ok';r.textContent=`Sụt hiện tại ${fmt(dd,1)}% từ đỉnh — dưới ngưỡng 20% (giảm nửa rủi ro) và 25% (tắt bot).`}
+  // KPIs
+  const K=[
+    ['Số dư',fmt(A.bal)+' USD',`Equity ${fmt(A.eq)} USD`],
+    ['Lời/lỗ đã chốt',`<span class="${cls(A.closedUsd)}">${sgn(A.closedUsd)} USD</span>`,`${A.trades.length} lệnh từ ${$('from').value?new Date(fromMs).toLocaleDateString('vi-VN'):'đầu'}`],
+    ['Tăng trưởng',`<span class="${cls(A.growth)}">${sgn(A.growth)}%</span>`,`tính cả lệnh đang mở: ${sgn(A.growthEq)}% · đã loại nạp/rút`],
+    ['Đang nổi',`<span class="${cls(A.eq-A.bal)}">${sgn(A.eq-A.bal)} USD</span>`,`${(s.pos||[]).filter(p=>BOTS[p[1]]).length} lệnh của bot`],
+    ['Sụt lớn nhất',`<span class="down">${fmt(A.maxdd*100,1)}%</span>`,`backtest gộp: 16.2% (p95 ~27%)`],
+    ['Nạp/rút ròng',fmt(A.deposits)+' USD','trong giai đoạn đang xem']];
+  $('kpis').innerHTML=K.map(k=>`<div class="panel kpi"><div class="l">${k[0]}</div><div class="v num">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('');
+  // bots
+  $('bots').innerHTML=MAGS.map(m=>{
+    const B=BOTS[m],b=A.bots[m],[st,sc,sn]=b.status;
+    const meter=(lab,v,max,unit)=>{const p=Math.min(100,max?v/max*100:0);const c=p>=100?'--down':p>=70?'--warn':'--up';
+      return `<div class="meter"><div style="display:flex;justify-content:space-between"><span class="sub">${lab}</span><span class="mono">${fmt(v,unit==='R'?1:0)}${unit} / ${max}${unit}</span></div><div class="bar"><i style="width:${p}%;background:${css(c)}"></i></div></div>`};
+    return `<div class="panel bot"><h3><span class="dot" style="background:${css(B.color)};width:10px;height:10px"></span>${B.name}<span class="sub" style="font-weight:400">· ${B.risk}%/lệnh</span><span class="badge ${sc}">${st}</span></h3>
+    <div class="stats">
+      <div><span>Số lệnh</span><span class="num">${b.n}</span></div>
+      <div><span>Thắng</span><span class="num">${b.win==null?'—':fmt(b.win,0)+'%'} <span class="sub">(bt ${B.bwin}%)</span></span></div>
+      <div><span>Lời/lỗ</span><span class="num ${cls(b.usd)}">${sgn(b.usd)} $</span></div>
+      <div><span>Tổng R</span><span class="num ${cls(b.R)}">${sgn(b.R,1)}R</span></div>
+      <div><span>R/lệnh</span><span class="num ${cls(b.avg)}">${sgn(b.avg)} <span class="sub">(bt ${sgn(B.br)})</span></span></div>
+      <div><span>PF</span><span class="num">${b.pf===Infinity?'∞':fmt(b.pf)}</span></div>
+      <div><span>6 tháng gần nhất</span><span class="num ${cls(b.r6)}">${sgn(b.r6,1)}R <span class="sub">(tệ nhất ${B.m6})</span></span></div>
+      <div><span>Thua liền dài nhất</span><span class="num">${b.ms}</span></div>
+    </div>
+    ${meter('Sụt từ đỉnh (R) / mức xấu nhất',b.dd,B.dd,'R')}
+    ${meter('Đang thua liền / kỷ lục',b.cs,B.ws,'')}
+    ${sn?`<div class="note">${sn}</div>`:''}${b.n&&b.n<20?`<div class="note">Mới ${b.n} lệnh — còn quá ít để kết luận.</div>`:''}</div>`}).join('');
+  drawChart(A);
+  // monthly
+  const ks=Object.keys(A.mIdx).concat(Object.keys(A.months)).filter((v,i,a)=>a.indexOf(v)===i).sort().reverse();
+  $('mon').innerHTML=`<tr><th>Tháng</th>${MAGS.map(m=>`<th class="n">${BOTS[m].name}</th>`).join('')}<th class="n">Tài khoản</th></tr>`+
+    (ks.length?ks.map(k=>`<tr><td class="mono">${k.slice(5)}/${k.slice(0,4)}</td>${MAGS.map(m=>{const o=(A.months[k]||{})[m];return `<td class="n ${o?cls(o.R):''}">${o?sgn(o.R,1)+'R <span class="sub">('+o.n+')</span>':'<span class="sub">—</span>'}</td>`}).join('')}<td class="n ${cls(A.mIdx[k])}">${A.mIdx[k]!=null?sgn(A.mIdx[k])+'%':'—'}</td></tr>`).join(''):'<tr><td colspan="5" class="sub">Chưa có lệnh</td></tr>');
+  // open positions
+  const op=(s.pos||[]).filter(p=>BOTS[p[1]]);
+  $('open').innerHTML=`<tr><th>Bot</th><th>Lệnh</th><th class="n">Lot</th><th class="n">Giá vào</th><th class="n">SL</th><th class="n">Đang nổi</th><th class="n">R</th></tr>`+
+    (op.length?op.map(p=>{const fl=p[7]/A.F, R=A.bal>0?fl/(A.bal*BOTS[p[1]].risk/100):0;
+      return `<tr><td>${BOTS[p[1]].name}</td><td>${p[3]===0?'MUA':'BÁN'} ${p[2]}</td><td class="n">${fmt(p[4])}</td><td class="n">${p[5]}</td><td class="n">${+p[6]?p[6]:'—'}</td><td class="n ${cls(fl)}">${sgn(fl)} $</td><td class="n ${cls(R)}">${sgn(R)}</td></tr>`}).join(''):'<tr><td colspan="7" class="sub">Không có lệnh nào đang mở</td></tr>');
+  const other=(s.pos||[]).length-op.length;
+  $('openNote').textContent=other>0?`Ngoài ra có ${other} lệnh không thuộc 3 bot (đánh tay hoặc EA khác).`:'';
+  // trades
+  $('ttabs').innerHTML=[['all','Tất cả'],...MAGS.map(m=>[String(m),BOTS[m].name])].map(([k,l])=>`<button class="tab ${tradeFilter===k?'on':''}" data-k="${k}">${l}</button>`).join('');
+  const why={3:'bot đóng',4:'chạm SL',5:'chạm TP',6:'stop out',0:'đóng tay',1:'đóng tay (ĐT)',2:'đóng tay (web)'};
+  const tl=A.trades.filter(t=>tradeFilter==='all'||String(t.m)===tradeFilter).slice().reverse().slice(0,60);
+  $('trades').innerHTML=`<tr><th>Đóng lúc (VN)</th><th>Bot</th><th>Lệnh</th><th class="n">Lot</th><th class="n">Vào</th><th class="n">Ra</th><th>Lý do</th><th class="n">Giữ</th><th class="n">Lời/lỗ</th><th class="n">R</th></tr>`+
+    (tl.length?tl.map(t=>{const h=(t.close-t.open)/36e5;return `<tr><td class="mono">${dfmt.format(new Date(t.close))}</td><td>${BOTS[t.m].name}</td><td>${t.side} ${t.sym}</td><td class="n">${fmt(t.vol)}</td><td class="n">${t.op}</td><td class="n">${t.cp}</td><td>${(why[t.rs]||'khác')+(t.rs===4&&t.pnl>0?' (đã khóa lời)':'')}</td><td class="n">${h<48?fmt(h,1)+' h':fmt(h/24,1)+' ngày'}</td><td class="n ${cls(t.pnl)}">${sgn(t.pnl)} $</td><td class="n ${cls(t.R)}">${sgn(t.R)}</td></tr>`}).join(''):'<tr><td colspan="10" class="sub">Chưa có lệnh đóng</td></tr>');
+}
+function drawChart(A){
+  const c=$('ch'); if(chart) chart.destroy();
+  const grid=css('--line'), ink=css('--mute');
+  let ds=[];
+  if(view==='acc'){
+    ds=[{label:'Tài khoản %',data:A.curve.map(([t,v])=>({x:t,y:v})),borderColor:css('--accent'),backgroundColor:css('--accent')+'22',fill:true,pointRadius:0,tension:0,borderWidth:2,stepped:true}];
+  } else {
+    ds=MAGS.map(m=>{let c=0;const t=A.trades.filter(x=>x.m===m);return {label:BOTS[m].name,data:[{x:A.trades.length?A.trades[0].open:Date.now(),y:0},...t.map(x=>({x:x.close,y:(c+=view==='r'?x.R:x.pnl)}))],borderColor:css(BOTS[m].color),backgroundColor:css(BOTS[m].color),pointRadius:2,stepped:true,borderWidth:2}});
+  }
+  chart=new Chart(c,{type:'line',data:{datasets:ds},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'nearest',intersect:false},
+    plugins:{legend:{display:view!=='acc',labels:{color:ink,boxWidth:12}},tooltip:{callbacks:{title:i=>dfmt.format(new Date(i[0].parsed.x)),label:i=>`${i.dataset.label}: ${sgn(i.parsed.y)}${view==='acc'?'%':view==='r'?'R':' $'}`}}},
+    scales:{x:{type:'linear',max:Date.now(),ticks:{color:ink,maxTicksLimit:7,callback:v=>new Intl.DateTimeFormat('vi-VN',{timeZone:tz,day:'2-digit',month:'2-digit'}).format(new Date(v))},grid:{color:grid}},
+      y:{ticks:{color:ink,callback:v=>v+(view==='acc'?'%':view==='r'?'R':'')},grid:{color:grid}}}}});
+}
+
+/* ---------- demo data ---------- */
+function demoData(){
+  let seed=7; const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+  const deals=[]; let k=1000, bal=10000, t0=Date.UTC(2026,8,1)/1000;
+  deals.push([k++,t0,2,0,0,0,'',0,0,10000,0,0,0,0]);
+  const P={260911:{p:.40,w:2.4,every:14,sym:'XAUUSDc',px:3650},260912:{p:.41,w:2.0,every:7,sym:'USDJPYc',px:150},260914:{p:.44,w:4.2,every:28,sym:'BTCUSDc',px:65000}};
+  for(const m of MAGS){let t=t0+86400*rnd()*5;while(t<Date.now()/1000-86400*2){
+    const B=BOTS[m],q=P[m],risk=bal*B.risk/100,win=rnd()<q.p,R=win?(0.3+rnd()*q.w*1.6):-(0.85+rnd()*0.2),side=rnd()<.5?0:1;
+    const dur=(m===260914?86400*(2+rnd()*8):3600*(2+rnd()*8));
+    deals.push([k++,Math.round(t),side,0,m,k,q.sym,0.05,q.px.toFixed(2),0,0,0,0,3]);
+    deals.push([k++,Math.round(t+dur),1-side,1,m,k-1,q.sym,0.05,(q.px*(1+(side?-1:1)*R*0.003)).toFixed(2),+(R*risk).toFixed(2),0,0,0,win?3:4]);
+    bal+=R*risk; t+=86400*q.every*(0.4+rnd()*1.2);}}
+  deals.sort((a,b)=>a[1]-b[1]);
+  bal=deals.reduce((a,d)=>a+d[9],0);
+  return {ok:true,deals,equity:[],snap:{bal,eq:bal+23.4,cur:'USC',off:0,real:true,rt:Date.now()-2*60000,
+    pos:[[555,260914,'BTCUSDc',0,0.02,'91250.00','88100.00',23.4,Math.round(Date.now()/1000-86400*3)]]}};
+}
+
+/* ---------- boot ---------- */
+async function load(){
+  if(DEMO){RAW=demoData();show();return}
+  const url=LS.get('ea_url'),pass=LS.get('ea_pass');
+  if(!url||!pass){$('login').classList.remove('hidden');$('app').classList.add('hidden');return}
+  $('upd').textContent='Đang tải…';
+  try{RAW=await fetchData(url,pass);show()}catch(e){LS.del('ea_pass');$('login').classList.remove('hidden');$('app').classList.add('hidden');$('err').textContent=e.message||'Không tải được'}
+}
+function show(){
+  $('login').classList.add('hidden');$('app').classList.remove('hidden');$('demoTag').classList.toggle('hidden',!DEMO);
+  if(!$('from').value){const f=LS.get('ea_from');if(f)$('from').value=f}
+  render();
+}
+$('go').onclick=()=>{const u=$('u').value.trim(),p=$('p').value;if(!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(u)){$('err').textContent='Link phải có dạng https://script.google.com/macros/s/…/exec';return}
+  LS.set('ea_url',u);LS.set('ea_pass',p);$('err').textContent='';DEMO=false;load()};
+$('p').addEventListener('keydown',e=>{if(e.key==='Enter')$('go').click()});
+$('out').onclick=()=>{LS.del('ea_pass');if(DEMO){location.hash='';DEMO=false};$('p').value='';load()};
+$('reload').onclick=load;
+$('from').onchange=()=>{LS.set('ea_from',$('from').value);render()};
+$('ctabs').onclick=e=>{const b=e.target.closest('.tab');if(!b)return;view=b.dataset.v;[...$('ctabs').children].forEach(x=>x.classList.toggle('on',x===b));render()};
+$('ttabs').onclick=e=>{const b=e.target.closest('.tab');if(!b)return;tradeFilter=b.dataset.k;render()};
+window.addEventListener('hashchange',()=>{DEMO=location.hash==='#demo';load()});
+DEMO=location.hash==='#demo';
+$('u').value=LS.get('ea_url')||'';
+load();
+setInterval(()=>{if(!DEMO&&RAW&&!document.hidden)load()},5*60000);
+</script>
+</body>
+</html>
