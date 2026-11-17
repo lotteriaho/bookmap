@@ -54,7 +54,7 @@ button,input{font:inherit;color:inherit}
 .btn{border:1px solid var(--line2);background:var(--panel);border-radius:8px;padding:6px 12px;font-size:12.5px;cursor:pointer;color:var(--ink2)}
 .btn:hover{border-color:var(--ink2)}
 .btn.pri{background:var(--ink);border-color:var(--ink);color:var(--panel);font-weight:500;padding:9px 16px;font-size:14px}
-input[type=date]{border:1px solid var(--line2);border-radius:8px;padding:5px 8px;background:var(--panel);font-size:12.5px}
+input[type=date]{border:1px solid var(--line2);border-radius:8px;padding:5px 6px;width:128px;background:var(--panel);font-size:12.5px}
 .demo{font-size:11.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--warn);background:var(--warn-bg);padding:4px 9px;border-radius:6px}
 
 /* layout */
@@ -150,10 +150,10 @@ footer{font-size:12px;color:var(--mute);margin-top:18px;line-height:1.6}
     <span id="demoTag" class="demo hidden">Dữ liệu trình diễn</span>
     <span class="sp"></span>
     <span class="status" id="upd"><span class="pulse"></span>—</span>
-    <div class="seg" id="range"><button data-r="all" class="on">Toàn bộ</button><button data-r="30">30N</button><button data-r="90">90N</button><button data-r="ytd">Năm nay</button></div>
+    <div class="seg" id="range"><button data-r="ea" class="on">Từ khi chạy EA</button><button data-r="all">Toàn bộ</button><button data-r="30">30N</button><button data-r="90">90N</button></div>
     <input type="date" id="from" title="Tính từ ngày">
     <button class="btn" id="reload" title="Làm mới dữ liệu">↻</button>
-    <button class="btn" id="out" title="Đăng xuất">Thoát</button>
+    <button class="btn" id="out" title="Đăng xuất">⏻</button>
   </div></div>
 
   <main class="wrap">
@@ -185,7 +185,7 @@ footer{font-size:12px;color:var(--mute);margin-top:18px;line-height:1.6}
     </div>
 
     <footer>
-      <div><b>Phương pháp.</b> R = lời/lỗ ÷ (số dư lúc vào lệnh × % rủi ro của chiến lược). Tăng trưởng tính theo kiểu time-weighted, đã loại nạp/rút. Giờ hiển thị theo giờ Việt Nam. Tài khoản cent được quy đổi sang USD (100 USC = 1 USD).</div>
+      <div><b>Phương pháp.</b> R = lời/lỗ ÷ (số dư lúc vào lệnh × % rủi ro của chiến lược). Tăng trưởng và sụt giảm chỉ tính lệnh của 3 bot (time-weighted, đã loại nạp/rút và lệnh đánh tay); số dư là số dư thật của tài khoản. "Từ khi chạy EA" bắt đầu từ ngày bot vào lệnh đầu tiên. Giờ hiển thị theo giờ Việt Nam. Tài khoản cent được quy đổi sang USD (100 USC = 1 USD).</div>
       <div>Kết quả quá khứ không đảm bảo kết quả tương lai. Đây không phải lời khuyên đầu tư.</div>
     </footer>
   </main>
@@ -207,7 +207,7 @@ const tz='Asia/Ho_Chi_Minh';
 const dfmt=new Intl.DateTimeFormat('vi-VN',{timeZone:tz,day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
 const dshort=new Intl.DateTimeFormat('vi-VN',{timeZone:tz,day:'2-digit',month:'2-digit',year:'numeric'});
 const mkey=ms=>new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit'}).format(new Date(ms)).slice(0,7);
-let RAW=null,chart=null,view='acc',tradeFilter='all',DEMO=false,range=LS.get('ea_range')||'all';
+let RAW=null,chart=null,view='acc',tradeFilter='all',DEMO=false,range=LS.get('ea_range2')||'ea';
 
 /* ---------- data ---------- */
 async function fetchData(url,pass){
@@ -221,10 +221,11 @@ function analyse(D,fromMs){
   const F=/USC|CENT/i.test(snap.cur||'')?100:1, off=snap.off||0;
   const deals=D.deals.map(r=>({k:+r[0],t:(+r[1]-off)*1000,ty:+r[2],en:+r[3],m:+r[4],p:+r[5],s:String(r[6]),v:+r[7],pr:+r[8],amt:(+r[9])+(+r[10])+(+r[11])+(+r[12]),rs:+r[13]}))
     .sort((a,b)=>a.t-b.t||a.k-b.k);
-  let bal=0,idx=1; const idxS=[], pos={};
+  let bal=0,idx=1; const idxS=[], pos={}, pm={};
+  for(const d of deals) if(d.ty<=1&&d.en===0) pm[d.p]=d.m;
   for(const d of deals){
     d.before=bal; bal+=d.amt;
-    if(d.ty<=1){ if(d.before>0&&d.amt) idx*=1+d.amt/d.before; (pos[d.p]=pos[d.p]||[]).push(d); }
+    if(d.ty<=1){ if(BOTS[pm[d.p]||d.m]&&d.before>0&&d.amt) idx*=1+d.amt/d.before; (pos[d.p]=pos[d.p]||[]).push(d); }
     idxS.push([d.t,idx]);
   }
   const trades=[];
@@ -243,7 +244,8 @@ function analyse(D,fromMs){
   const startIdx=(idxS.filter(x=>x[0]<fromMs).pop()||[0,1])[1];
   const curve=idxS.filter(x=>x[0]>=fromMs).map(x=>[x[0],(x[1]/startIdx-1)*100]);
   let peak=1,maxdd=0; for(const [,v] of curve){const q=1+v/100; peak=Math.max(peak,q); maxdd=Math.max(maxdd,1-q/peak)}
-  const nowBalIdx=idx/startIdx, nowEqIdx=snap.bal>0?nowBalIdx*snap.eq/snap.bal:nowBalIdx;
+  const botFloat=(snap.pos||[]).filter(p=>BOTS[p[1]]).reduce((a,p)=>a+(+p[7]),0);
+  const nowBalIdx=idx/startIdx, nowEqIdx=snap.bal>0?nowBalIdx*(1+botFloat/snap.bal):nowBalIdx;
   const curDD=Math.max(0,1-nowEqIdx/peak);
   const now=Date.now(), bots={};
   for(const m of MAGS){
@@ -262,7 +264,7 @@ function analyse(D,fromMs){
   for(const k of keys){const last=curve.filter(c=>mkey(c[0])===k).pop(); const v=1+last[1]/100; mIdx[k]=(v/prev-1)*100; prev=v}
   const deposits=deals.filter(d=>d.ty===2&&d.t>=fromMs).reduce((a,d)=>a+d.amt,0)/F;
   return {F,snap,trades:T,curve,maxdd,curDD,growth:(nowBalIdx-1)*100,growthEq:(nowEqIdx-1)*100,bots,months,mIdx,deposits,
-    closedUsd:T.reduce((a,x)=>a+x.pnl,0),bal:snap.bal/F,eq:snap.eq/F};
+    closedUsd:T.reduce((a,x)=>a+x.pnl,0),botFloat:botFloat/F,bal:snap.bal/F,eq:snap.eq/F};
 }
 function status(m,dd,cs,r6,n){
   const B=BOTS[m];
@@ -276,6 +278,8 @@ function status(m,dd,cs,r6,n){
 /* ---------- render ---------- */
 function fromMs(){
   const now=new Date();
+  if(range==='ea'){let t=Infinity;for(const r of (RAW&&RAW.deals)||[]){if(+r[2]<=1&&+r[3]===0&&BOTS[+r[4]])t=Math.min(t,(+r[1]-((RAW.snap||{}).off||0))*1000)}
+    return isFinite(t)?new Date(new Intl.DateTimeFormat('en-CA',{timeZone:tz}).format(new Date(t))+'T00:00:00+07:00').getTime():0}
   if(range==='30') return Date.now()-30*864e5;
   if(range==='90') return Date.now()-90*864e5;
   if(range==='ytd') return new Date(now.getFullYear()+'-01-01T00:00:00+07:00').getTime();
@@ -285,14 +289,14 @@ function fromMs(){
 function render(){
   [...$('range').children].forEach(b=>b.classList.toggle('on',b.dataset.r===range));
   const A=analyse(RAW,fromMs()), s=A.snap, age=s.rt?(Date.now()-s.rt)/60000:null, live=age!=null&&age<15;
-  $('upd').innerHTML=`<span class="pulse ${live?'':'off'}"></span>`+(s.rt?(live?'Trực tuyến':'Mất kết nối')+` · ${age<1?'vừa cập nhật':'cập nhật '+Math.round(age)+' phút trước'}`:'Chưa có dữ liệu')+(s.real===false?' · demo':'');
+  $('upd').innerHTML=`<span class="pulse ${live?'':'off'}"></span>`+(s.rt?(live?'Trực tuyến':'Mất kết nối')+` · ${age<1?'vừa xong':Math.round(age)+' phút trước'}`:'Chưa có dữ liệu')+(s.real===false?' · demo':'');
   $('upd').title=s.rt?'MT5 gửi lúc '+dfmt.format(new Date(s.rt)):'';
   const nPos=(s.pos||[]).filter(p=>BOTS[p[1]]).length;
   const K=[
     ['Số dư',`${fmt(A.bal)}`,`Vốn thực ${fmt(A.eq)} USD`],
-    ['Tăng trưởng',`<span class="${cls(A.growth)}">${sgn(A.growth)}%</span>`,`Gồm lệnh mở: ${sgn(A.growthEq)}%`],
+    ['Tăng trưởng (3 bot)',`<span class="${cls(A.growth)}">${sgn(A.growth)}%</span>`,`Gồm lệnh mở: ${sgn(A.growthEq)}%`],
     ['Lợi nhuận đã chốt',`<span class="${cls(A.closedUsd)}">${sgn(A.closedUsd)}</span>`,`USD · ${A.trades.length} giao dịch`],
-    ['Lãi/lỗ tạm tính',`<span class="${cls(A.eq-A.bal)}">${sgn(A.eq-A.bal)}</span>`,`USD · ${nPos} vị thế mở`],
+    ['Lãi/lỗ tạm tính',`<span class="${cls(A.botFloat)}">${sgn(A.botFloat)}</span>`,`USD · ${nPos} vị thế của bot`],
     ['Sụt giảm tối đa',`<span class="${A.maxdd>0?'down':''}">${A.maxdd>0?'−':''}${fmt(A.maxdd*100,1)}%</span>`,'Backtest gộp: −16.2%'],
     ['Nạp / rút ròng',`${fmt(A.deposits)}`,'USD trong kỳ']];
   $('kpis').innerHTML=K.map(k=>`<div><div class="eyebrow">${k[0]}</div><div class="kv">${k[1]}</div><div class="f">${k[2]}</div></div>`).join('');
@@ -401,8 +405,8 @@ $('go').onclick=()=>{let u=$('u').value.trim().replace(/\s+/g,''),p=$('p').value
 $('p').addEventListener('keydown',e=>{if(e.key==='Enter')$('go').click()});
 $('out').onclick=()=>{LS.del('ea_pass');$('p').value='';if(DEMO){DEMO=false;location.hash=''}else load()};
 $('reload').onclick=load;
-$('range').onclick=e=>{const b=e.target.closest('button');if(!b)return;range=b.dataset.r;LS.set('ea_range',range);render()};
-$('from').onchange=()=>{LS.set('ea_from',$('from').value);range=$('from').value?'custom':'all';LS.set('ea_range',range);render()};
+$('range').onclick=e=>{const b=e.target.closest('button');if(!b)return;range=b.dataset.r;LS.set('ea_range2',range);render()};
+$('from').onchange=()=>{LS.set('ea_from',$('from').value);range=$('from').value?'custom':'ea';LS.set('ea_range2',range);render()};
 $('ctabs').onclick=e=>{const b=e.target.closest('.tab');if(!b)return;view=b.dataset.v;[...$('ctabs').children].forEach(x=>x.classList.toggle('on',x===b));render()};
 $('ttabs').onclick=e=>{const b=e.target.closest('.tab');if(!b)return;tradeFilter=b.dataset.k;render()};
 window.addEventListener('hashchange',()=>{DEMO=location.hash==='#demo';load()});
