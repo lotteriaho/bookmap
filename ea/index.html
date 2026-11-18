@@ -173,7 +173,7 @@ footer{font-size:12px;color:var(--mute);margin-top:18px;line-height:1.6}
     </div>
 
     <div class="card sec">
-      <div class="hd"><h2>Hiệu suất theo chiến lược</h2><span class="s">So với mức xấu nhất trong backtest 2020–2026</span></div>
+      <div class="hd"><h2>Hiệu suất theo chiến lược</h2></div>
       <div class="tw"><table id="bots"></table></div>
       <div class="notes" id="botNotes"></div>
     </div>
@@ -284,7 +284,7 @@ function status(m,dd,cs,r6,n){
   const B=BOTS[m];
   if(n<1) return ['Chưa giao dịch','p-new',''];
   if(dd>B.stop||cs>=Math.ceil(B.ws*1.5)) return ['Dừng & rà soát','p-stop',`${B.name}: sụt ${fmt(dd,1)}R vượt ngưỡng dừng ${B.stop}R hoặc chuỗi thua quá dài — tắt riêng chiến lược này và chạy lại Tester.`];
-  if(dd>B.dd||cs>B.ws||r6<B.m6) return ['Vượt lịch sử','p-bad',`${B.name}: đã tệ hơn mức xấu nhất từng có trong backtest — rà soát theo 4 bước, chạy tiếp với nửa rủi ro.`];
+  if(dd>B.dd||cs>B.ws||r6<B.m6) return ['Vượt lịch sử','p-bad',`${B.name}: đã tệ hơn mức xấu nhất từng có — rà soát theo 4 bước, chạy tiếp với nửa rủi ro.`];
   if(dd>=0.7*B.dd||cs>=Math.ceil(0.7*B.ws)) return ['Theo dõi','p-warn',`${B.name}: đang gần mức xấu nhất từng có, vẫn trong phạm vi lịch sử.`];
   return ['Ổn định','p-ok',''];
 }
@@ -307,7 +307,7 @@ function render(){
     ['Tăng trưởng (3 bot)',`<span class="${cls(A.growth)}">${sgn(A.growth)}%</span>`,`Gồm lệnh mở: ${sgn(A.growthEq)}%`],
     ['Lợi nhuận đã chốt',`<span class="${cls(A.closedUsd)}">${sgn(A.closedUsd)}</span>`,`USD · ${A.trades.length} giao dịch`],
     ['Lãi/lỗ tạm tính',`<span class="${cls(A.botFloat)}">${sgn(A.botFloat)}</span>`,`USD · ${nPos} vị thế của bot`],
-    ['Sụt giảm tối đa',`<span class="${A.maxdd>0?'down':''}">${A.maxdd>0?'−':''}${fmt(A.maxdd*100,1)}%</span>`,ACCS[ACC].ftmo?`Giới hạn FTMO: −${ACCS[ACC].ftmo.max}%`:'Backtest gộp: −16.2%'],
+    ['Sụt giảm tối đa',`<span class="${A.maxdd>0?'down':''}">${A.maxdd>0?'−':''}${fmt(A.maxdd*100,1)}%</span>`,ACCS[ACC].ftmo?`Giới hạn FTMO: −${ACCS[ACC].ftmo.max}%`:'Ngưỡng dừng: −25%'],
     ['Nạp / rút ròng',`${fmt(A.deposits)}`,'USD trong kỳ']];
   $('kpis').innerHTML=K.map(k=>`<div><div class="eyebrow">${k[0]}</div><div class="kv">${k[1]}</div><div class="f">${k[2]}</div></div>`).join('');
   const dd=A.curDD*100, pos=Math.min(100,dd/25*100);
@@ -335,7 +335,7 @@ function render(){
   const notes=MAGS.map(m=>A.bots[m].status[2]).filter(Boolean);
   const few=MAGS.filter(m=>A.bots[m].n>0&&A.bots[m].n<20).map(m=>BOTS[m].name);
   if(few.length) notes.push(`${few.join(', ')}: dưới 20 giao dịch — mẫu còn quá nhỏ để đánh giá.`);
-  $('botNotes').innerHTML=notes.map(n=>`<div>${n}</div>`).join('')||'<div>Tất cả chiến lược đang trong phạm vi backtest.</div>';
+  $('botNotes').innerHTML=notes.map(n=>`<div>${n}</div>`).join('')||'<div>Tất cả chiến lược đang trong phạm vi bình thường.</div>';
   drawChart(A);
   // monthly
   const ks=[...new Set(Object.keys(A.mIdx).concat(Object.keys(A.months)))].sort().reverse();
