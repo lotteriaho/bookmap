@@ -186,7 +186,8 @@ footer{font-size:12px;color:var(--mute);margin-top:18px;line-height:1.6}
 
     <div class="two sec">
       <div class="card"><div class="hd"><h2>Lợi nhuận theo tháng</h2></div><div class="tw"><table id="mon"></table></div></div>
-      <div class="card"><div class="hd"><h2>Vị thế đang mở</h2><span class="s" id="openNote"></span></div><div class="tw"><table id="open"></table></div></div>
+      <div class="card"><div class="hd"><h2>Vị thế đang mở · trong danh mục</h2><span class="s" id="openNote"></span></div><div class="tw"><table id="open"></table></div>
+        <div class="hd" style="border-top:1px solid var(--line)"><h2>Ngoài danh mục</h2><span class="s" id="otherNote"></span></div><div class="tw"><table id="other"></table></div></div>
     </div>
 
     <div class="card sec">
@@ -347,8 +348,12 @@ function render(){
   $('open').innerHTML=`<tr><th>Chiến lược</th><th>Lệnh</th><th class="n">Lot</th><th class="n">Giá vào</th><th class="n">Dừng lỗ</th><th class="n">Tạm tính</th><th class="n">R</th></tr>`+
     (op.length?op.map(p=>{const fl=p[7]/A.F, R=A.bal>0?fl/(A.bal*BOTS[p[1]].risk/100):0;
       return `<tr><td class="name"><span class="sw" style="background:${css(BOTS[p[1]].color)}"></span>${BOTS[p[1]].name}</td><td>${p[3]===0?'Mua':'Bán'} <span class="mute">${p[2]}</span></td><td class="n">${fmt(p[4])}</td><td class="n">${p[5]}</td><td class="n">${+p[6]?p[6]:'—'}</td><td class="n ${cls(fl)}">${sgn(fl)}</td><td class="n ${cls(R)}">${sgn(R)}</td></tr>`}).join(''):'<tr><td colspan="7" class="mute">Không có vị thế mở</td></tr>');
-  const other=(s.pos||[]).length-op.length;
-  $('openNote').textContent=other>0?`+${other} vị thế ngoài danh mục`:'';
+  const sumFl=L=>L.reduce((a,p)=>a+p[7]/A.F,0);
+  $('openNote').innerHTML=op.length?`${op.length} vị thế · <span class="${cls(sumFl(op))}">${sgn(sumFl(op))} USD</span>`:'';
+  const ot=(s.pos||[]).filter(p=>!BOTS[p[1]]);
+  $('otherNote').innerHTML=ot.length?`${ot.length} vị thế · <span class="${cls(sumFl(ot))}">${sgn(sumFl(ot))} USD</span> · không tính vào thống kê bot`:'Lệnh tay hoặc EA khác';
+  $('other').innerHTML=`<tr><th>Nguồn</th><th>Lệnh</th><th class="n">Lot</th><th class="n">Giá vào</th><th class="n">Dừng lỗ</th><th class="n">Tạm tính</th><th class="n">Mở lúc</th></tr>`+
+    (ot.length?ot.map(p=>{const fl=p[7]/A.F;return `<tr><td class="name">${+p[1]?'Magic '+p[1]:'Lệnh tay'}</td><td>${p[3]===0?'Mua':'Bán'} <span class="mute">${p[2]}</span></td><td class="n">${fmt(p[4])}</td><td class="n">${p[5]}</td><td class="n">${+p[6]?p[6]:'—'}</td><td class="n ${cls(fl)}">${sgn(fl)}</td><td class="n mono">${p[8]?dfmt.format(new Date((p[8]-(s.off||0))*1000)):'—'}</td></tr>`}).join(''):'<tr><td colspan="7" class="mute">Không có vị thế ngoài danh mục</td></tr>');
   // trades
   $('ttabs').innerHTML=[['all','Tất cả'],...MAGS.map(m=>[String(m),BOTS[m].name])].map(([k,l])=>`<button class="tab ${tradeFilter===k?'on':''}" data-k="${k}">${l}</button>`).join('');
   const why={3:'Tín hiệu thoát',4:'Dừng lỗ',5:'Chốt lời',6:'Stop out',0:'Thủ công',1:'Thủ công',2:'Thủ công'};
