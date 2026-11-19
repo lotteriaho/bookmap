@@ -12,9 +12,11 @@
 //| v1.00 (17/11/2026)                                                |
 //| v1.01: InpAccount - nhieu tai khoan dung chung 1 Apps Script      |
 //|        (Exness de "exness", FTMO de "ftmo").                      |
+//| v1.02: gui kem so tai khoan; doi sang tai khoan moi (vd FTMO moi) |
+//|        thi Sheet tu cat lich su cu sang tab rieng, khong tron.    |
 //+------------------------------------------------------------------+
 #property copyright "StatsSync"
-#property version   "1.01"
+#property version   "1.02"
 #property description "Dong bo lich su lenh 3 bot len Google Sheet cho trang thong ke"
 
 input string InpUrl      = "";   // Link Apps Script (.../exec)
@@ -23,7 +25,7 @@ input string InpAccount  = "exness"; // Ten tai khoan tren trang thong ke: exnes
 input int    InpEverySec = 300;  // Gui moi N giay
 input int    InpChunk    = 150;  // So deal moi lan gui
 
-string GV = "StatsSync_last";
+string GV = "StatsSync_last";   // + "_" + so tai khoan (dat trong Sync)
 bool   g_warned = false;
 bool   g_first = true;
 
@@ -110,6 +112,7 @@ void Sync()
   {
    if(InpUrl == "" || InpKey == "") { if(!g_warned) { Print("StatsSync: chua dien InpUrl / InpKey"); g_warned = true; } return; }
    if(MQLInfoInteger(MQL_TESTER)) return;
+   GV = "StatsSync_last_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
    datetime last = GlobalVariableCheck(GV) ? (datetime)GlobalVariableGet(GV) : 0;
    datetime from = last > 0 ? last - 3 * 86400 : 0;   // gui lai 3 ngay gan nhat cho chac, server tu bo trung
    datetime now = TimeCurrent();
@@ -127,13 +130,13 @@ void Sync()
       cnt++;
       if(cnt >= InpChunk)
         {
-         ok = ok && Post("{\"act\":\"push\",\"acc\":" + J(InpAccount) + ",\"key\":" + J(InpKey) + ",\"deals\":[" + arr + "]}");
+         ok = ok && Post("{\"act\":\"push\",\"acc\":" + J(InpAccount) + ",\"login\":" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + ",\"key\":" + J(InpKey) + ",\"deals\":[" + arr + "]}");
          arr = ""; cnt = 0;
          if(!ok) break;
         }
      }
    if(ok)
-      ok = Post("{\"act\":\"push\",\"acc\":" + J(InpAccount) + ",\"key\":" + J(InpKey) + ",\"deals\":[" + arr + "],\"snap\":" + SnapJson() + "}");
+      ok = Post("{\"act\":\"push\",\"acc\":" + J(InpAccount) + ",\"login\":" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + ",\"key\":" + J(InpKey) + ",\"deals\":[" + arr + "],\"snap\":" + SnapJson() + "}");
    if(ok)
      {
       GlobalVariableSet(GV, (double)now);
@@ -145,7 +148,7 @@ void Sync()
 
 int OnInit()
   {
-   Print("StatsSync v1.01 [", InpAccount, "]: gui moi ", InpEverySec, " giay. Khong vao lenh.");
+   Print("StatsSync v1.02 [", InpAccount, "]: gui moi ", InpEverySec, " giay. Khong vao lenh.");
    EventSetTimer(5);   // lan dau gui sau 5 giay
    return INIT_SUCCEEDED;
   }

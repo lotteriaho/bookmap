@@ -6,6 +6,8 @@
  * Deploy > New deployment > Web app: Execute as = Me, Who has access = Anyone.
  * Nhiều tài khoản: EA gửi "acc" (vd exness / ftmo). exness dùng tab deals/snap/equity,
  * tài khoản khác dùng tab deals_<acc>, snap_<acc>, equity_<acc>.
+ * Đổi sang số tài khoản MT5 khác (vd FTMO mới): lịch sử cũ được đổi tên thành
+ * <tab>_<số TK cũ> (hoặc _cu nếu chưa biết), tài khoản mới bắt đầu sạch.
  */
 var COLS = ['ticket','time','type','entry','magic','position','symbol','volume','price','profit','swap','commission','fee','reason'];
 
@@ -39,7 +41,25 @@ function sh_(name, header) {
   return s;
 }
 
+function rotate_(b, x) {
+  if (!b.login) return;                       // StatsSync cũ (chưa gửi số TK): bỏ qua
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var P = PropertiesService.getScriptProperties(), key = 'LOGIN' + x;
+  var cur = P.getProperty(key), now = String(b.login);
+  if (cur === now) return;
+  var tag = cur ? cur : 'cu';
+  ['deals', 'snap', 'equity'].forEach(function (n) {
+    var s = ss.getSheetByName(n + x);
+    if (!s) return;
+    var nm = n + x + '_' + tag, i = 2;
+    while (ss.getSheetByName(nm)) nm = n + x + '_' + tag + '_' + (i++);
+    s.setName(nm);
+  });
+  P.setProperty(key, now);
+}
+
 function push_(b, x) {
+  rotate_(b, x);
   var s = sh_('deals' + x, COLS);
   var have = {};
   var n = s.getLastRow();
